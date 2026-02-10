@@ -78,10 +78,15 @@ class EventBus:
 
     async def subscribe(self, channel: str, callback: Callable[[Dict[str, Any]], Awaitable[None]]):
         """订阅频道"""
+        # 确保已连接
+        if not self.is_connected:
+            await self.connect()
+
         if channel not in self.subscribers:
             self.subscribers[channel] = []
-            if self.is_connected and self._pubsub:
+            if self._pubsub:
                 await self._pubsub.subscribe(channel)
+                logger.info(f"EventBus Redis 订阅频道: [{channel}]")
                 
         self.subscribers[channel].append(callback)
         logger.info(f"EventBus 新增订阅者: [{channel}]")
@@ -92,6 +97,12 @@ class EventBus:
             try:
                 if not self.is_connected or not self._pubsub:
                     await asyncio.sleep(1)
+                    continue
+
+                # 没有订阅任何频道时，跳过 get_message 避免报错
+                # "pubsub connection not set: did you forget to call subscribe()?"
+                if not self.subscribers:
+                    await asyncio.sleep(0.5)
                     continue
                     
                 message = await self._pubsub.get_message(ignore_subscribe_messages=True, timeout=1.0)
