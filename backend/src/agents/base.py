@@ -505,15 +505,18 @@ class BaseLegalAgent(ABC):
                     temperature = 1.0
                 
                 # 防护：确保 user 消息不为空
-                if not message or not message.strip():
+                # 注意：不能对闭包变量 message 赋值，否则 Python 会将其视为局部变量
+                # 导致 UnboundLocalError
+                user_message = message
+                if not user_message or not user_message.strip():
                     logger.warning(f"Agent {self.name}: stream_chat 收到空的用户消息，使用默认提示")
-                    message = "请根据上下文提供分析和建议。"
+                    user_message = "请根据上下文提供分析和建议。"
                 
                 payload = {
                     "model": model_name,
                     "messages": [
                         {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": message}
+                        {"role": "user", "content": user_message}
                     ],
                     "temperature": temperature,
                     "stream": True,
