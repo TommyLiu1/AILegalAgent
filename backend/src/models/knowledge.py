@@ -1,0 +1,100 @@
+"""
+知识库模型
+"""
+
+from typing import Optional
+from sqlalchemy import String, Text, ForeignKey, Integer, Enum as SQLEnum, Boolean
+from sqlalchemy import JSON as JSONB
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+import enum
+
+from src.models.base import Base, TimestampMixin, GUID
+
+
+class KnowledgeType(str, enum.Enum):
+    """知识类型"""
+    LAW = "law"  # 法律法规
+    REGULATION = "regulation"  # 部门规章
+    CASE = "case"  # 司法判例
+    INTERPRETATION = "interpretation"  # 司法解释
+    TEMPLATE = "template"  # 合同模板
+    ARTICLE = "article"  # 法律文章
+    INTERNAL = "internal"  # 内部知识
+    OTHER = "other"
+
+
+class KnowledgeBase(Base, TimestampMixin):
+    """知识库"""
+    
+    __tablename__ = "knowledge_bases"
+    
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    description: Mapped[Optional[str]] = mapped_column(Text)
+    knowledge_type: Mapped[KnowledgeType] = mapped_column(
+        SQLEnum(KnowledgeType), default=KnowledgeType.OTHER
+    )
+    
+    # 统计信息
+    doc_count: Mapped[int] = mapped_column(Integer, default=0)
+    total_chunks: Mapped[int] = mapped_column(Integer, default=0)
+    
+    # 向量存储信息
+    vector_collection: Mapped[Optional[str]] = mapped_column(String(100))
+    embedding_model: Mapped[str] = mapped_column(
+        String(100), default="text-embedding-3-large"
+    )
+    embedding_dimensions: Mapped[int] = mapped_column(Integer, default=3072)
+    
+    # 配置
+    is_public: Mapped[bool] = mapped_column(Boolean, default=False)
+    config: Mapped[Optional[dict]] = mapped_column(JSONB)
+    
+    # 外键
+    org_id: Mapped[Optional[str]] = mapped_column(
+        GUID(), ForeignKey("organizations.id", ondelete="CASCADE")
+    )
+    created_by: Mapped[Optional[str]] = mapped_column(
+        GUID(), ForeignKey("users.id", ondelete="SET NULL")
+    )
+    
+    # 关系
+    documents: Mapped[list["KnowledgeDocument"]] = relationship(
+        "KnowledgeDocument", back_populates="knowledge_base", cascade="all, delete-orphan"
+    )
+
+
+class KnowledgeDocument(Base, TimestampMixin):
+    """知识库文档"""
+    
+    __tablename__ = "knowledge_documents"
+    
+    title: Mapped[str] = mapped_column(String(500), nullable=False)
+    source: Mapped[Optional[str]] = mapped_column(String(255))  # 来源
+    source_url: Mapped[Optional[str]] = mapped_column(String(500))
+    
+    # 内容
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    summary: Mapped[Optional[str]] = mapped_column(Text)
+    
+    # 处理状态
+    is_processed: Mapped[bool] = mapped_column(Boolean, default=False)
+    chunk_count: Mapped[int] = mapped_column(Integer, default=0)
+    
+    # 元数据
+    extra_metadata: Mapped[Optional[dict]] = mapped_column(JSONB)
+    tags: Mapped[Optional[list]] = mapped_column(JSONB)
+    
+    # 法律相关字段
+    law_category: Mapped[Optional[str]] = mapped_column(String(100))  # 法律类别
+    effective_date: Mapped[Optional[str]] = mapped_column(String(50))  # 生效日期
+    issuing_authority: Mapped[Optional[str]] = mapped_column(String(255))  # 发布机关
+    
+    # 外键
+    knowledge_base_id: Mapped[str] = mapped_column(
+        GUID(), ForeignKey("knowledge_bases.id", ondelete="CASCADE"), nullable=False
+    )
+    
+    # 关系
+    knowledge_base: Mapped["KnowledgeBase"] = relationship(
+        "KnowledgeBase", back_populates="documents"
+    )
