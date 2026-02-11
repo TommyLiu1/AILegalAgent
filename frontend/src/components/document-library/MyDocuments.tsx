@@ -160,7 +160,7 @@ export function MyDocuments() {
   };
 
   return (
-    <div className="h-full overflow-y-auto p-4 lg:p-6 bg-[#F2F2F7]">
+    <div className="h-full overflow-y-auto p-4 lg:p-6 bg-muted">
       <input
         type="file"
         ref={fileInputRef}
@@ -182,25 +182,25 @@ export function MyDocuments() {
 
       <div className="flex flex-col lg:flex-row lg:items-center justify-between mb-4 lg:mb-6 gap-3">
         <div>
-          <h3 className="font-semibold text-[#1C1C1E]">我的文档</h3>
-          <p className="text-sm text-[#8E8E93] mt-1">{total} 个文档</p>
+          <h3 className="font-semibold text-foreground">我的文档</h3>
+          <p className="text-sm text-muted-foreground mt-1">{total} 个文档</p>
         </div>
 
         <div className="flex flex-1 max-w-xl gap-2 items-center">
             <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/50" />
                 <input 
                     type="text" 
                     placeholder="搜索文档..." 
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full pl-9 pr-4 py-2 bg-white border border-[#E5E5EA] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#007AFF]/20 focus:border-[#007AFF]"
+                    className="w-full pl-9 pr-4 py-2 bg-card border border-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
                 />
             </div>
             <select
                 value={filterType}
                 onChange={(e) => setFilterType(e.target.value)}
-                className="px-3 py-2 bg-white border border-[#E5E5EA] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#007AFF]/20 focus:border-[#007AFF]"
+                className="px-3 py-2 bg-card border border-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
             >
                 <option value="all">全部类型</option>
                 {Object.entries(DOC_TYPE_LABELS).map(([value, label]) => (
@@ -213,14 +213,14 @@ export function MyDocuments() {
           <button
             onClick={loadDocuments}
             disabled={loading}
-            className="p-2.5 bg-white text-[#007AFF] rounded-xl hover:bg-[#E5F3FF] transition-colors text-sm font-medium shadow-sm active:scale-98 disabled:opacity-50"
+            className="p-2.5 bg-card text-primary rounded-xl hover:bg-primary/10 transition-colors text-sm font-medium shadow-sm active:scale-98 disabled:opacity-50"
           >
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
           </button>
           
           <button
             onClick={handleCreateClick}
-            className="px-4 py-2.5 bg-white text-[#007AFF] border border-[#007AFF]/20 rounded-xl hover:bg-[#E5F3FF] transition-colors text-sm font-medium flex items-center justify-center gap-2 shadow-sm active:scale-98"
+            className="px-4 py-2.5 bg-card text-primary border border-primary/20 rounded-xl hover:bg-primary/10 transition-colors text-sm font-medium flex items-center justify-center gap-2 shadow-sm active:scale-98"
           >
             <Plus className="w-4 h-4" />
             新建文档
@@ -229,7 +229,7 @@ export function MyDocuments() {
           <button
             onClick={handleUploadClick}
             disabled={uploading}
-            className="px-4 py-2.5 bg-[#007AFF] text-white rounded-xl hover:bg-[#0051D5] transition-colors text-sm font-medium flex items-center justify-center gap-2 shadow-sm active:scale-98 disabled:opacity-50"
+            className="px-4 py-2.5 bg-primary text-white rounded-xl hover:bg-primary/90 transition-colors text-sm font-medium flex items-center justify-center gap-2 shadow-sm active:scale-98 disabled:opacity-50"
           >
             {uploading ? (
               <Loader2 className="w-4 h-4 animate-spin" />
@@ -244,22 +244,22 @@ export function MyDocuments() {
       {/* Documents List */}
       {loading ? (
         <div className="flex items-center justify-center py-12">
-          <Loader2 className="w-8 h-8 animate-spin text-[#007AFF]" />
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
         </div>
       ) : documents.length === 0 ? (
-        <div className="text-center py-12 bg-white rounded-2xl border border-[#E5E5EA]">
-          <FileText className="w-12 h-12 mx-auto text-[#8E8E93] mb-4" />
-          <p className="text-[#8E8E93]">暂无文档</p>
+        <div className="text-center py-12 bg-card rounded-2xl border border-border">
+          <FileText className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
+          <p className="text-muted-foreground">暂无文档</p>
           <div className="flex justify-center gap-4 mt-4">
             <button
                 onClick={handleCreateClick}
-                className="text-[#007AFF] hover:underline"
+                className="text-primary hover:underline"
             >
                 新建文档
             </button>
             <button
                 onClick={handleUploadClick}
-                className="text-[#007AFF] hover:underline"
+                className="text-primary hover:underline"
             >
                 上传文件
             </button>
@@ -275,22 +275,22 @@ export function MyDocuments() {
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: index * 0.05 }}
-                className="flex items-center justify-between p-3 lg:p-4 bg-white border border-[#E5E5EA] rounded-2xl hover:border-[#007AFF] hover:shadow-lg transition-all group active:scale-[0.99]"
+                className="flex items-center justify-between p-3 lg:p-4 bg-card border border-border rounded-2xl hover:border-primary hover:shadow-lg transition-all group active:scale-[0.99]"
               >
                 <div className="flex items-center gap-3 lg:gap-4 flex-1 min-w-0">
                   {/* Icon */}
                   <div className={`w-10 h-10 lg:w-12 lg:h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${
-                    fileType === 'pdf' ? 'bg-[#FF3B30]/10' : 'bg-[#007AFF]/10'
+                    fileType === 'pdf' ? 'bg-destructive/10' : 'bg-primary/10'
                   }`}>
                     <FileText className={`w-5 h-5 lg:w-6 lg:h-6 ${
-                      fileType === 'pdf' ? 'text-[#FF3B30]' : 'text-[#007AFF]'
+                      fileType === 'pdf' ? 'text-destructive' : 'text-primary'
                     }`} />
                   </div>
 
                   {/* Info */}
                   <div className="flex-1 min-w-0">
-                    <h4 className="font-medium text-[#1C1C1E] truncate text-sm lg:text-base">{doc.name}</h4>
-                    <div className="flex items-center gap-2 text-xs text-[#8E8E93] mt-1 flex-wrap">
+                    <h4 className="font-medium text-foreground truncate text-sm lg:text-base">{doc.name}</h4>
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1 flex-wrap">
                       <div className="flex items-center gap-1">
                         <Folder className="w-3 h-3" />
                         <span>{DOC_TYPE_LABELS[doc.doc_type] || doc.doc_type}</span>
@@ -301,7 +301,7 @@ export function MyDocuments() {
                       <span>{formatDate(doc.created_at)}</span>
                     </div>
                     {doc.ai_summary && (
-                      <p className="text-xs text-[#007AFF] mt-1 truncate">{doc.ai_summary}</p>
+                      <p className="text-xs text-primary mt-1 truncate">{doc.ai_summary}</p>
                     )}
                   </div>
                 </div>
@@ -311,7 +311,7 @@ export function MyDocuments() {
                   <button
                     onClick={() => handleAnalyze(doc.id)}
                     disabled={analyzingId === doc.id}
-                    className="p-2 hover:bg-[#E5F3FF] rounded-lg text-[#007AFF] transition-colors active:scale-95 disabled:opacity-50"
+                    className="p-2 hover:bg-primary/10 rounded-lg text-primary transition-colors active:scale-95 disabled:opacity-50"
                     title="AI分析"
                   >
                     {analyzingId === doc.id ? (
@@ -320,22 +320,22 @@ export function MyDocuments() {
                       <Sparkles className="w-4 h-4" />
                     )}
                   </button>
-                  <button className="p-2 hover:bg-[#E5F3FF] rounded-lg text-[#007AFF] transition-colors active:scale-95">
+                  <button className="p-2 hover:bg-primary/10 rounded-lg text-primary transition-colors active:scale-95">
                     <Download className="w-4 h-4" />
                   </button>
                   <button 
                     onClick={() => handleEditClick(doc)}
-                    className="hidden lg:block p-2 hover:bg-[#E5F3FF] rounded-lg text-[#007AFF] transition-colors active:scale-95"
+                    className="hidden lg:block p-2 hover:bg-primary/10 rounded-lg text-primary transition-colors active:scale-95"
                   >
                     <Edit className="w-4 h-4" />
                   </button>
                   <button
                     onClick={() => handleDelete(doc.id)}
-                    className="hidden lg:block p-2 hover:bg-[#FFF1F0] rounded-lg text-[#FF3B30] transition-colors active:scale-95"
+                    className="hidden lg:block p-2 hover:bg-destructive/10 rounded-lg text-destructive transition-colors active:scale-95"
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
-                  <button className="lg:hidden p-2 hover:bg-[#F2F2F7] rounded-lg text-[#8E8E93] transition-colors active:scale-95">
+                  <button className="lg:hidden p-2 hover:bg-muted rounded-lg text-muted-foreground transition-colors active:scale-95">
                     <MoreVertical className="w-4 h-4" />
                   </button>
                 </div>

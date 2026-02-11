@@ -114,7 +114,8 @@ class LegalResearchAgent(BaseLegalAgent):
     async def process(self, task: Dict[str, Any]) -> AgentResponse:
         """处理法律研究任务"""
         description = task.get("description", "")
-        context = task.get("context", {})
+        context = task.get("context") or {}
+        llm_config = context.get("llm_config") or task.get("llm_config")
         
         # 构建研究提示
         prompt = f"""
@@ -132,21 +133,38 @@ class LegalResearchAgent(BaseLegalAgent):
 请确保引用准确，注明法律法规的时效性。
 """
         
-        # 调用Agent
-        response = await self.chat(prompt)
+        # Inject dependency results
+        dep_results = task.get("dependent_results", {})
+        if dep_results:
+            dep_context = "\n\n--- 前序分析结果 ---\n"
+            for dep_id, dep_res in dep_results.items():
+                if hasattr(dep_res, 'content'):
+                    dep_context += f"\n{dep_res.agent_name}:\n{dep_res.content[:1500]}\n"
+                elif isinstance(dep_res, dict):
+                    dep_context += f"\n{dep_res.get('agent_name', dep_id)}:\n{str(dep_res.get('content', ''))[:1500]}\n"
+            prompt += dep_context
         
-        # 提取引用
-        citations = self._extract_citations(response)
-        
-        return AgentResponse(
-            agent_name=self.name,
-            content=response,
-            reasoning="基于法律法规数据库和判例库进行综合研究",
-            citations=citations,
-            actions=[
-                {"type": "research_complete", "description": "法律研究完成"}
-            ]
-        )
+        try:
+            response = await self.chat(prompt, llm_config=llm_config)
+            
+            # 提取引用
+            citations = self._extract_citations(response)
+            
+            return AgentResponse(
+                agent_name=self.name,
+                content=response,
+                reasoning="基于法律法规数据库和判例库进行综合研究",
+                citations=citations,
+                actions=[
+                    {"type": "research_complete", "description": "法律研究完成"}
+                ]
+            )
+        except Exception as e:
+            return AgentResponse(
+                agent_name=self.name,
+                content=f"处理失败: {str(e)[:200]}",
+                metadata={"error": True}
+            )
     
     def _extract_citations(self, response: str) -> List[Dict]:
         """提取法律引用"""

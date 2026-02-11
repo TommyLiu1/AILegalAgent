@@ -112,14 +112,14 @@ export function TemplateGallery() {
 
   if (loading) {
     return (
-      <div className="h-full flex items-center justify-center bg-[#F2F2F7]">
-        <Loader2 className="w-8 h-8 animate-spin text-[#007AFF]" />
+      <div className="h-full flex items-center justify-center bg-muted">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
       </div>
     );
   }
 
   return (
-    <div className="h-full overflow-y-auto p-4 lg:p-6 bg-[#F2F2F7]">
+    <div className="h-full overflow-y-auto p-4 lg:p-6 bg-muted">
       {/* Filters */}
       <div className="flex gap-2 mb-4 lg:mb-6 overflow-x-auto pb-2">
         {categories.map((category) => (
@@ -128,8 +128,8 @@ export function TemplateGallery() {
             onClick={() => setSelectedCategory(category)}
             className={`px-4 py-2 rounded-xl text-sm font-medium transition-all whitespace-nowrap ${
               selectedCategory === category
-                ? 'bg-[#007AFF] text-white shadow-sm'
-                : 'bg-white text-[#3C3C43] hover:bg-[#E5E5EA] border border-[#E5E5EA]'
+                ? 'bg-primary text-white shadow-sm'
+                : 'bg-white text-foreground/80 hover:bg-border border border-border'
             }`}
           >
             {category === 'all' ? '全部模板' : category}
@@ -145,17 +145,17 @@ export function TemplateGallery() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: index * 0.05 }}
-            className="bg-white border border-[#E5E5EA] rounded-2xl p-4 lg:p-5 hover:border-[#007AFF] hover:shadow-lg transition-all cursor-pointer group active:scale-98"
+            className="bg-white border border-border rounded-2xl p-4 lg:p-5 hover:border-primary hover:shadow-lg transition-all cursor-pointer group active:scale-98"
           >
             {/* Icon */}
-            <div className="w-12 h-12 bg-gradient-to-br from-[#007AFF] to-[#0051D5] rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform shadow-sm">
+            <div className="w-12 h-12 bg-gradient-to-br from-primary to-primary/80 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform shadow-sm">
               <FileText className="w-6 h-6 text-white" />
             </div>
 
             {/* Content */}
-            <h3 className="font-semibold text-[#1C1C1E] mb-1">{template.name}</h3>
-            <p className="text-xs text-[#8E8E93] mb-3">{template.category}</p>
-            <p className="text-sm text-[#3C3C43] leading-relaxed mb-4 line-clamp-2">
+            <h3 className="font-semibold text-foreground mb-1">{template.name}</h3>
+            <p className="text-xs text-muted-foreground mb-3">{template.category}</p>
+            <p className="text-sm text-foreground/80 leading-relaxed mb-4 line-clamp-2">
               {template.description}
             </p>
 
@@ -164,7 +164,7 @@ export function TemplateGallery() {
               {template.tags.map((tag) => (
                 <span
                   key={tag}
-                  className="px-2 py-0.5 bg-[#F2F2F7] text-[#8E8E93] rounded-full text-xs"
+                  className="px-2 py-0.5 bg-muted text-muted-foreground rounded-full text-xs"
                 >
                   {tag}
                 </span>
@@ -172,14 +172,14 @@ export function TemplateGallery() {
             </div>
 
             {/* Stats & Actions */}
-            <div className="flex items-center justify-between pt-4 border-t border-[#E5E5EA]">
-              <div className="flex items-center gap-3 text-xs text-[#8E8E93]">
+            <div className="flex items-center justify-between pt-4 border-t border-border">
+              <div className="flex items-center gap-3 text-xs text-muted-foreground">
                 <div className="flex items-center gap-1">
                   <Download className="w-3 h-3" />
                   <span>{template.downloads}</span>
                 </div>
                 <div className="flex items-center gap-1">
-                  <Star className="w-3 h-3 fill-[#FF9500] text-[#FF9500]" />
+                  <Star className="w-3 h-3 fill-warning text-warning" />
                   <span>{template.rating}</span>
                 </div>
               </div>
@@ -187,7 +187,7 @@ export function TemplateGallery() {
                 <button 
                   onClick={() => handleUseTemplate(template)}
                   disabled={!!processingId}
-                  className="p-1.5 hover:bg-[#E5F3FF] rounded-lg text-[#007AFF] active:scale-95 transition-all flex items-center gap-1 px-2"
+                  className="p-1.5 hover:bg-primary/10 rounded-lg text-primary active:scale-95 transition-all flex items-center gap-1 px-2"
                 >
                   {processingId === template.id ? (
                     <Loader2 className="w-4 h-4 animate-spin" />
@@ -198,7 +198,7 @@ export function TemplateGallery() {
                     </>
                   )}
                 </button>
-                <button className="p-1.5 hover:bg-[#E5F3FF] rounded-lg text-[#007AFF] active:scale-95 transition-all">
+                <button className="p-1.5 hover:bg-primary/10 rounded-lg text-primary active:scale-95 transition-all">
                   <Eye className="w-4 h-4" />
                 </button>
               </div>

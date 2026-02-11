@@ -16,26 +16,47 @@
     --secondary-foreground: 222.2 47.4% 11.2%;
     --muted: 210 40% 96.1%;
     --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 60 100% 69%;
+    --accent: 210 40% 96.1%;
     --accent-foreground: 216 30% 15%;
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
-    --ring: 216 100% 50% / 0.1;
-    --radius: 0.5rem;
+    --ring: 216 100% 50%;
+    --radius: 0.75rem;
 
     /* 安心AI法务 - Wanli Blue 色阶 */
-    --primary-50: 210 100% 95%;
-    --primary-100: 214 100% 85%;
-    --primary-200: 214 100% 75%;
-    --primary-300: 214 100% 65%;
+    --primary-50: 210 100% 97%;
+    --primary-100: 214 100% 92%;
+    --primary-200: 214 100% 82%;
+    --primary-300: 214 100% 68%;
     --primary-400: 214 100% 55%;
     --primary-500: 216 100% 50%;
     --primary-600: 216 100% 40%;
     --primary-700: 216 100% 30%;
     --primary-800: 216 100% 20%;
     --primary-900: 216 100% 10%;
+
+    /* 语义颜色 - 成功/警告/信息 */
+    --success: 142 71% 45%;
+    --success-foreground: 0 0% 100%;
+    --success-light: 142 76% 96%;
+    --warning: 38 92% 50%;
+    --warning-foreground: 38 92% 20%;
+    --warning-light: 48 96% 95%;
+    --info: 199 89% 48%;
+    --info-foreground: 0 0% 100%;
+    --info-light: 199 92% 95%;
+
+    /* 侧边栏 */
+    --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 240 5.3% 26.1%;
+    --sidebar-primary: 216 100% 50%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 210 40% 96.1%;
+    --sidebar-accent-foreground: 216 30% 15%;
+    --sidebar-border: 220 13% 91%;
+    --sidebar-ring: 216 100% 50%;
   }
 
   .dark {
@@ -58,6 +79,27 @@
     --border: 217.2 32.6% 17.5%;
     --input: 217.2 32.6% 17.5%;
     --ring: 224.3 76.3% 48%;
+
+    /* 语义颜色 - 暗色模式 */
+    --success: 142 71% 45%;
+    --success-foreground: 0 0% 100%;
+    --success-light: 142 40% 15%;
+    --warning: 38 92% 50%;
+    --warning-foreground: 48 96% 95%;
+    --warning-light: 38 50% 15%;
+    --info: 199 89% 48%;
+    --info-foreground: 0 0% 100%;
+    --info-light: 199 50% 15%;
+
+    /* 侧边栏 - 暗色模式 */
+    --sidebar-background: 222.2 84% 4.9%;
+    --sidebar-foreground: 210 40% 98%;
+    --sidebar-primary: 217.2 91.2% 59.8%;
+    --sidebar-primary-foreground: 222.2 47.4% 11.2%;
+    --sidebar-accent: 217.2 32.6% 17.5%;
+    --sidebar-accent-foreground: 210 40% 98%;
+    --sidebar-border: 217.2 32.6% 17.5%;
+    --sidebar-ring: 224.3 76.3% 48%;
   }
 }
 
@@ -66,7 +108,7 @@
     @apply border-border;
   }
   html {
-    font-family: "Inter", "PingFang SC", "Microsoft YaHei", sans-serif;
+    font-family: "Inter", "PingFang SC", "Microsoft YaHei", "Hiragino Sans GB", sans-serif;
   }
   body {
     @apply bg-background text-foreground;
@@ -91,12 +133,12 @@
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(0, 101, 255, 0.1);
+  background: hsl(var(--primary) / 0.1);
   border-radius: 10px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(0, 101, 255, 0.2);
+  background: hsl(var(--primary) / 0.2);
 }
 
 /* 隐藏滚动条（用于横向滑动） */

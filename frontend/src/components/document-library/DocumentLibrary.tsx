@@ -15,12 +15,12 @@ export function DocumentLibrary() {
   ];
 
   return (
-    <div className="h-full flex flex-col bg-[#F2F2F7]">
+    <div className="h-full flex flex-col bg-muted">
       {/* Header with Tabs */}
-      <div className="bg-white border-b border-[#E5E5EA] px-6 pt-6">
+      <div className="bg-card border-b border-border px-6 pt-6">
         <div className="mb-4">
-          <h2 className="text-xl font-semibold text-[#1C1C1E]">智能文档</h2>
-          <p className="text-sm text-[#8E8E93] mt-1">专业法律文书模板 + AI 智能生成</p>
+          <h2 className="text-xl font-semibold text-foreground">智能文档</h2>
+          <p className="text-sm text-muted-foreground mt-1">专业法律文书模板 + AI 智能生成</p>
         </div>
 
         <div className="flex gap-1">
@@ -32,8 +32,8 @@ export function DocumentLibrary() {
                 onClick={() => setActiveTab(tab.id as any)}
                 className={`px-4 py-2.5 rounded-t-xl text-sm font-medium transition-all flex items-center gap-2 relative ${
                   activeTab === tab.id
-                    ? 'text-[#007AFF]'
-                    : 'text-[#8E8E93] hover:text-[#1C1C1E]'
+                    ? 'text-primary'
+                    : 'text-muted-foreground hover:text-foreground'
                 }`}
               >
                 <Icon className="w-4 h-4" />
@@ -41,7 +41,7 @@ export function DocumentLibrary() {
                 {activeTab === tab.id && (
                   <motion.div
                     layoutId="activeTab"
-                    className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#007AFF]"
+                    className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary"
                   />
                 )}
               </button>

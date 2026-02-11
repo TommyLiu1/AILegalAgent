@@ -40,7 +40,7 @@ export function CompanyProfile({ data, companyName }: CompanyProfileProps) {
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="bg-gradient-to-br from-[#007AFF] to-[#0051D5] rounded-2xl border border-[#007AFF]/30 p-6 text-white shadow-lg"
+      className="bg-gradient-to-br from-primary to-primary/80 rounded-2xl border border-primary/30 p-6 text-white shadow-lg"
     >
       <div className="flex items-start justify-between mb-6">
         <div>
@@ -49,7 +49,7 @@ export function CompanyProfile({ data, companyName }: CompanyProfileProps) {
             <span className="px-3 py-1 bg-white/20 rounded-full text-sm font-medium">
               {companyData.employees}
             </span>
-            <span className="px-3 py-1 bg-[#34C759]/90 rounded-full text-sm font-medium">
+            <span className="px-3 py-1 bg-success/90 rounded-full text-sm font-medium">
               ✓ 正常经营
             </span>
           </div>
@@ -75,7 +75,7 @@ export function CompanyProfile({ data, companyName }: CompanyProfileProps) {
                 <Icon className="w-4 h-4 text-white/70" />
                 <span className="text-xs text-white/70">{item.label}</span>
               </div>
-              <p className={`text-sm font-medium ${item.highlight ? 'text-[#34C759]' : ''}`}>
+              <p className={`text-sm font-medium ${item.highlight ? 'text-success' : ''}`}>
                 {item.value}
               </p>
             </motion.div>

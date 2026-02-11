@@ -52,40 +52,40 @@ export function AnnotationPanel({ selectedAnnotation, onClose }: AnnotationPanel
   const typeConfig = {
     error: {
       icon: AlertCircle,
-      color: 'text-[#FF3B30]',
-      bg: 'bg-[#FFF1F0]',
-      border: 'border-[#FF3B30]',
+      color: 'text-destructive',
+      bg: 'bg-destructive/10',
+      border: 'border-destructive',
       label: '错误',
     },
     warning: {
       icon: AlertTriangle,
-      color: 'text-[#FF9500]',
-      bg: 'bg-[#FFF8ED]',
-      border: 'border-[#FF9500]',
+      color: 'text-warning',
+      bg: 'bg-warning/10',
+      border: 'border-warning',
       label: '警告',
     },
     suggestion: {
       icon: Lightbulb,
-      color: 'text-[#007AFF]',
-      bg: 'bg-[#E5F3FF]',
-      border: 'border-[#007AFF]',
+      color: 'text-primary',
+      bg: 'bg-primary/10',
+      border: 'border-primary',
       label: '建议',
     },
     learn: {
       icon: BookOpen,
-      color: 'text-[#AF52DE]',
-      bg: 'bg-[#F5EDFF]',
-      border: 'border-[#AF52DE]',
+      color: 'text-accent',
+      bg: 'bg-accent/10',
+      border: 'border-accent',
       label: '学习',
     },
   };
 
   return (
-    <div className="h-full bg-white">
+    <div className="h-full bg-card">
       <div className="p-4 lg:p-6">
         <div className="flex items-center justify-between mb-4 lg:mb-6">
-          <h3 className="font-semibold text-[#1C1C1E]">AI 批注建议</h3>
-          <span className="text-sm text-[#8E8E93]">{annotations.length} 条建议</span>
+          <h3 className="font-semibold text-foreground">AI 批注建议</h3>
+          <span className="text-sm text-muted-foreground">{annotations.length} 条建议</span>
         </div>
 
         <AnimatePresence mode="wait">
@@ -112,7 +112,7 @@ export function AnnotationPanel({ selectedAnnotation, onClose }: AnnotationPanel
                           <span className={`text-xs font-medium ${config.color}`}>
                             {config.label} · 第 {selectedAnnotation.lineNumber} 行
                           </span>
-                          <h4 className="font-medium text-[#1C1C1E] mt-1">
+                          <h4 className="font-medium text-foreground mt-1">
                             {selectedAnnotation.message}
                           </h4>
                         </div>
@@ -122,43 +122,43 @@ export function AnnotationPanel({ selectedAnnotation, onClose }: AnnotationPanel
                 </div>
                 <button
                   onClick={onClose}
-                  className="p-1 hover:bg-[#F2F2F7] rounded-lg transition-colors flex-shrink-0"
+                  className="p-1 hover:bg-muted rounded-lg transition-colors flex-shrink-0"
                 >
-                  <X className="w-4 h-4 text-[#8E8E93]" />
+                  <X className="w-4 h-4 text-muted-foreground" />
                 </button>
               </div>
 
-              <div className="bg-[#F2F2F7] rounded-xl p-4 border border-[#E5E5EA]">
-                <p className="text-sm text-[#3C3C43] leading-relaxed">
+              <div className="bg-muted rounded-xl p-4 border border-border">
+                <p className="text-sm text-foreground/80 leading-relaxed">
                   {selectedAnnotation.detail}
                 </p>
               </div>
 
               {selectedAnnotation.reference && (
-                <div className="bg-[#E5F3FF] rounded-xl p-4 border border-[#007AFF]/20">
+                <div className="bg-primary/10 rounded-xl p-4 border border-primary/20">
                   <div className="flex items-center gap-2 mb-2">
-                    <BookOpen className="w-4 h-4 text-[#007AFF]" />
-                    <span className="text-sm font-medium text-[#007AFF]">法律依据</span>
+                    <BookOpen className="w-4 h-4 text-primary" />
+                    <span className="text-sm font-medium text-primary">法律依据</span>
                   </div>
-                  <p className="text-sm text-[#1C1C1E]">{selectedAnnotation.reference}</p>
+                  <p className="text-sm text-foreground">{selectedAnnotation.reference}</p>
                 </div>
               )}
 
-              <div className="flex items-center gap-2 pt-4 border-t border-[#E5E5EA]">
-                <button className="flex-1 py-2.5 bg-[#34C759] text-white rounded-xl hover:bg-[#2DB04B] transition-colors text-sm font-medium active:scale-98 shadow-sm">
+              <div className="flex items-center gap-2 pt-4 border-t border-border">
+                <button className="flex-1 py-2.5 bg-success text-white rounded-xl hover:bg-success/90 transition-colors text-sm font-medium active:scale-98 shadow-sm">
                   采纳建议
                 </button>
-                <button className="px-4 py-2.5 border border-[#E5E5EA] text-[#1C1C1E] rounded-xl hover:bg-[#F2F2F7] transition-colors text-sm font-medium active:scale-98">
+                <button className="px-4 py-2.5 border border-border text-foreground rounded-xl hover:bg-muted transition-colors text-sm font-medium active:scale-98">
                   忽略
                 </button>
               </div>
 
               <div className="flex items-center justify-center gap-4 pt-2">
-                <button className="flex items-center gap-1 text-xs text-[#8E8E93] hover:text-[#34C759] transition-colors active:scale-95">
+                <button className="flex items-center gap-1 text-xs text-muted-foreground hover:text-success transition-colors active:scale-95">
                   <ThumbsUp className="w-3 h-3" />
                   <span>有帮助</span>
                 </button>
-                <button className="flex items-center gap-1 text-xs text-[#8E8E93] hover:text-[#FF3B30] transition-colors active:scale-95">
+                <button className="flex items-center gap-1 text-xs text-muted-foreground hover:text-destructive transition-colors active:scale-95">
                   <ThumbsDown className="w-3 h-3" />
                   <span>无帮助</span>
                 </button>
@@ -193,11 +193,11 @@ export function AnnotationPanel({ selectedAnnotation, onClose }: AnnotationPanel
                           <span className={`text-xs font-medium ${config.color}`}>
                             {config.label}
                           </span>
-                          <span className="text-xs text-[#8E8E93]">
+                          <span className="text-xs text-muted-foreground">
                             第 {annotation.lineNumber} 行
                           </span>
                         </div>
-                        <p className="text-sm text-[#1C1C1E] leading-relaxed line-clamp-2">
+                        <p className="text-sm text-foreground leading-relaxed line-clamp-2">
                           {annotation.message}
                         </p>
                       </div>

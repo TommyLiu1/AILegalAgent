@@ -65,7 +65,7 @@ const changeTypeConfig = {
   added: { label: '新增', color: 'text-green-600 bg-green-50 border-green-200', icon: CheckCircle },
   removed: { label: '删除', color: 'text-red-600 bg-red-50 border-red-200', icon: XCircle },
   modified: { label: '修改', color: 'text-amber-600 bg-amber-50 border-amber-200', icon: AlertTriangle },
-  unchanged: { label: '未变', color: 'text-gray-500 bg-gray-50 border-gray-200', icon: Minus },
+  unchanged: { label: '未变', color: 'text-zinc-500 dark:text-zinc-400 bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-700', icon: Minus },
 };
 
 const riskColors = {
@@ -89,40 +89,40 @@ export const ContractCompareCard = memo(function ContractCompareCard({ component
 
   return (
     <div className={cn(
-      'bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden',
+      'bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-100 dark:border-zinc-800 shadow-sm overflow-hidden',
       component.className,
     )}>
       {/* 标题栏 */}
-      <div className="px-4 py-3 border-b border-gray-100 bg-gradient-to-r from-blue-50/50 to-purple-50/50">
-        <h3 className="font-semibold text-sm text-gray-800">{data.title}</h3>
+      <div className="px-4 py-3 border-b border-zinc-100 dark:border-zinc-800 bg-gradient-to-r from-blue-50/50 to-purple-50/50 dark:from-blue-950/30 dark:to-purple-950/30">
+        <h3 className="font-semibold text-sm text-zinc-800 dark:text-zinc-200">{data.title}</h3>
         {data.subtitle && (
-          <p className="text-xs text-gray-500 mt-0.5">{data.subtitle}</p>
+          <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">{data.subtitle}</p>
         )}
       </div>
 
       {/* 摘要 */}
       {data.summary && (
-        <div className="px-4 py-3 bg-gray-50/50 border-b border-gray-100 flex items-center gap-4 text-xs">
-          <span className="text-gray-600">
+        <div className="px-4 py-3 bg-zinc-50/50 dark:bg-zinc-900/50 border-b border-zinc-100 dark:border-zinc-800 flex items-center gap-4 text-xs">
+          <span className="text-zinc-600 dark:text-zinc-400">
             共 <strong>{data.summary.totalClauses}</strong> 条 · 变更 <strong>{data.summary.changedClauses}</strong> 条
           </span>
           <span className={cn('px-2 py-0.5 rounded-full text-[10px] font-medium', riskColors[data.summary.riskLevel])}>
             风险: {data.summary.riskLevel === 'low' ? '低' : data.summary.riskLevel === 'medium' ? '中' : '高'}
           </span>
           {data.summary.recommendation && (
-            <span className="text-gray-500 flex-1 truncate">{data.summary.recommendation}</span>
+            <span className="text-zinc-500 dark:text-zinc-400 flex-1 truncate">{data.summary.recommendation}</span>
           )}
         </div>
       )}
 
       {/* 对比列头 */}
-      <div className="grid grid-cols-[1fr,1fr] gap-0 px-4 py-2 text-[10px] font-semibold text-gray-400 uppercase tracking-wider border-b border-gray-100">
+      <div className="grid grid-cols-[1fr,1fr] gap-0 px-4 py-2 text-[10px] font-semibold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider border-b border-zinc-100 dark:border-zinc-800">
         <span>{data.leftLabel}</span>
         <span>{data.rightLabel}</span>
       </div>
 
       {/* 条款对比列表 */}
-      <div className="divide-y divide-gray-50">
+      <div className="divide-y divide-zinc-50 dark:divide-zinc-800">
         {data.clauses.map((clause) => {
           const config = changeTypeConfig[clause.changeType];
           const ChangeIcon = config.icon;
@@ -133,17 +133,17 @@ export const ContractCompareCard = memo(function ContractCompareCard({ component
               {/* 条款标题行 */}
               <button
                 onClick={() => toggleClause(clause.id)}
-                className="w-full flex items-center gap-2 px-4 py-2.5 hover:bg-gray-50 transition-colors text-left"
+                className="w-full flex items-center gap-2 px-4 py-2.5 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors text-left"
               >
                 <ChangeIcon className={cn('w-3.5 h-3.5 flex-shrink-0', config.color.split(' ')[0])} />
-                <span className="text-xs font-medium text-gray-800 flex-1">{clause.clauseTitle}</span>
+                <span className="text-xs font-medium text-zinc-800 dark:text-zinc-200 flex-1">{clause.clauseTitle}</span>
                 <span className={cn('text-[10px] px-2 py-0.5 rounded-full border font-medium', config.color)}>
                   {config.label}
                 </span>
                 {clause.riskLevel && clause.riskLevel !== 'low' && (
                   <AlertTriangle className={cn('w-3 h-3', clause.riskLevel === 'high' ? 'text-red-500' : 'text-amber-500')} />
                 )}
-                {isExpanded ? <ChevronUp className="w-3.5 h-3.5 text-gray-400" /> : <ChevronDown className="w-3.5 h-3.5 text-gray-400" />}
+                {isExpanded ? <ChevronUp className="w-3.5 h-3.5 text-zinc-400 dark:text-zinc-500" /> : <ChevronDown className="w-3.5 h-3.5 text-zinc-400 dark:text-zinc-500" />}
               </button>
 
               {/* 展开的对比内容 */}
@@ -153,17 +153,17 @@ export const ContractCompareCard = memo(function ContractCompareCard({ component
                     {/* 左侧（原始） */}
                     <div className={cn(
                       'p-3 rounded-lg text-xs leading-relaxed',
-                      clause.changeType === 'removed' ? 'bg-red-50/50 text-red-800 line-through' : 'bg-gray-50 text-gray-700',
+                      clause.changeType === 'removed' ? 'bg-red-50/50 text-red-800 line-through' : 'bg-zinc-50 dark:bg-zinc-900 text-zinc-700 dark:text-zinc-300',
                     )}>
-                      {clause.leftContent || <span className="text-gray-400 italic">（无）</span>}
+                      {clause.leftContent || <span className="text-zinc-400 dark:text-zinc-500 italic">（无）</span>}
                     </div>
                     {/* 右侧（新版） */}
                     <div className={cn(
                       'p-3 rounded-lg text-xs leading-relaxed',
                       clause.changeType === 'added' ? 'bg-green-50/50 text-green-800' : 
-                      clause.changeType === 'modified' ? 'bg-amber-50/50 text-amber-800' : 'bg-gray-50 text-gray-700',
+                      clause.changeType === 'modified' ? 'bg-amber-50/50 text-amber-800' : 'bg-zinc-50 dark:bg-zinc-900 text-zinc-700 dark:text-zinc-300',
                     )}>
-                      {clause.rightContent || <span className="text-gray-400 italic">（无）</span>}
+                      {clause.rightContent || <span className="text-zinc-400 dark:text-zinc-500 italic">（无）</span>}
                     </div>
                   </div>
                   {/* AI 点评 */}
@@ -182,7 +182,7 @@ export const ContractCompareCard = memo(function ContractCompareCard({ component
 
       {/* 操作按钮 */}
       {data.actions && data.actions.length > 0 && (
-        <div className="px-4 py-3 border-t border-gray-100 flex items-center gap-2 justify-end">
+        <div className="px-4 py-3 border-t border-zinc-100 dark:border-zinc-800 flex items-center gap-2 justify-end">
           {data.actions.map((action) => (
             <button
               key={action.actionId}
@@ -196,8 +196,8 @@ export const ContractCompareCard = memo(function ContractCompareCard({ component
                 action.variant === 'primary'
                   ? 'bg-blue-600 text-white hover:bg-blue-700'
                   : action.variant === 'outline'
-                  ? 'border border-gray-200 text-gray-700 hover:bg-gray-50'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200',
+                  ? 'border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800'
+                  : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700',
               )}
             >
               {action.label}

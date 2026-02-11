@@ -78,18 +78,22 @@ class EventBus:
 
     async def subscribe(self, channel: str, callback: Callable[[Dict[str, Any]], Awaitable[None]]):
         """订阅频道"""
-        # 确保已连接
-        if not self.is_connected:
-            await self.connect()
-
         if channel not in self.subscribers:
             self.subscribers[channel] = []
-            if self._pubsub:
+            if self.is_connected and self._pubsub:
                 await self._pubsub.subscribe(channel)
-                logger.info(f"EventBus Redis 订阅频道: [{channel}]")
                 
         self.subscribers[channel].append(callback)
-        logger.info(f"EventBus 新增订阅者: [{channel}]")
+        logger.info(f"EventBus 新增订阅者: [{channel}] (当前 {len(self.subscribers[channel])} 个)")
+
+    async def unsubscribe(self, channel: str, callback: Callable[[Dict[str, Any]], Awaitable[None]]):
+        """取消订阅"""
+        if channel in self.subscribers:
+            try:
+                self.subscribers[channel].remove(callback)
+                logger.info(f"EventBus 移除订阅者: [{channel}] (剩余 {len(self.subscribers[channel])} 个)")
+            except ValueError:
+                pass  # callback 不在列表中
 
     async def _listen_loop(self):
         """监听循环"""
@@ -97,12 +101,6 @@ class EventBus:
             try:
                 if not self.is_connected or not self._pubsub:
                     await asyncio.sleep(1)
-                    continue
-
-                # 没有订阅任何频道时，跳过 get_message 避免报错
-                # "pubsub connection not set: did you forget to call subscribe()?"
-                if not self.subscribers:
-                    await asyncio.sleep(0.5)
                     continue
                     
                 message = await self._pubsub.get_message(ignore_subscribe_messages=True, timeout=1.0)
@@ -129,8 +127,15 @@ class EventBus:
             except asyncio.CancelledError:
                 break
             except Exception as e:
-                logger.error(f"EventBus 监听循环异常: {e}")
-                await asyncio.sleep(1)
+                if not hasattr(self, '_listen_backoff'):
+                    self._listen_backoff = 1
+                    self._listen_error_count = 0
+                self._listen_error_count += 1
+                # 仅在前 3 次和之后每 60 次打印错误，避免日志爆炸
+                if self._listen_error_count <= 3 or self._listen_error_count % 60 == 0:
+                    logger.error(f"EventBus 监听循环异常(#{self._listen_error_count}): {e}")
+                self._listen_backoff = min(self._listen_backoff * 2, 30)  # 最大 30s 退避
+                await asyncio.sleep(self._listen_backoff)
 
 # 全局单例
 event_bus = EventBus()

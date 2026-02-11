@@ -62,31 +62,67 @@ class ConsensusAgent(BaseLegalAgent):
         """处理共识任务"""
         # 这里 task 应该包含原始任务描述和各 Agent 的结果
         description = task.get("description", "")
+        context = task.get("context") or {}
+        llm_config = context.get("llm_config") or task.get("llm_config")
         agent_results = task.get("agent_results", [])
         
+        # Validate agent_results contains valid AgentResponse objects
+        valid_results = []
+        for r in agent_results:
+            if isinstance(r, AgentResponse):
+                valid_results.append(r)
+            elif isinstance(r, dict) and "content" in r:
+                valid_results.append(r)
+        
         results_str = "\n\n".join([
-            f"--- Agent: {r.agent_name} ---\n{r.content}" 
-            for r in agent_results if isinstance(r, AgentResponse)
+            f"--- Agent: {r.agent_name if isinstance(r, AgentResponse) else r.get('agent_name', 'Unknown')} ---\n"
+            f"{r.content if isinstance(r, AgentResponse) else r.get('content', '')}"
+            for r in valid_results
         ])
+        
+        if not results_str.strip():
+            return AgentResponse(
+                agent_name=self.name,
+                content="无有效的智能体结果可供共识分析",
+                metadata={"error": True, "reason": "empty_agent_results"}
+            )
         
         prompt = f"任务背景：{description}\n\n以下是各智能体的分析结果，请进行冲突审查并给出最终共识结论：\n\n{results_str}"
         
-        response_text = await self.chat(prompt)
+        # Inject dependency results
+        dep_results = task.get("dependent_results", {})
+        if dep_results:
+            dep_context = "\n\n--- 前序分析结果 ---\n"
+            for dep_id, dep_res in dep_results.items():
+                if hasattr(dep_res, 'content'):
+                    dep_context += f"\n{dep_res.agent_name}:\n{dep_res.content[:1500]}\n"
+                elif isinstance(dep_res, dict):
+                    dep_context += f"\n{dep_res.get('agent_name', dep_id)}:\n{str(dep_res.get('content', ''))[:1500]}\n"
+            prompt += dep_context
         
-        # 解析 JSON
-        json_match = re.search(r'(\{.*\})', response_text, re.DOTALL)
-        metadata = {}
-        content = response_text
-        
-        if json_match:
-            try:
-                metadata = json.loads(json_match.group(1))
-                content = metadata.get("final_decision", response_text)
-            except:
-                pass
-                
-        return AgentResponse(
-            agent_name=self.name,
-            content=content,
-            metadata=metadata
-        )
+        try:
+            response_text = await self.chat(prompt, llm_config=llm_config)
+            
+            # 解析 JSON
+            json_match = re.search(r'(\{.*\})', response_text, re.DOTALL)
+            metadata = {}
+            content = response_text
+            
+            if json_match:
+                try:
+                    metadata = json.loads(json_match.group(1))
+                    content = metadata.get("final_decision", response_text)
+                except:
+                    pass
+                    
+            return AgentResponse(
+                agent_name=self.name,
+                content=content,
+                metadata=metadata
+            )
+        except Exception as e:
+            return AgentResponse(
+                agent_name=self.name,
+                content=f"处理失败: {str(e)[:200]}",
+                metadata={"error": True}
+            )

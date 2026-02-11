@@ -344,7 +344,7 @@ class TestCaseServiceAIAnalysis:
     """测试案件AI分析功能"""
     
     @pytest.mark.asyncio
-    @patch('src.services.case_service.get_workforce')
+    @patch('src.agents.workforce.get_workforce')
     async def test_analyze_case(self, mock_get_workforce, db_session: AsyncSession, test_case: Case, test_user: User):
         """测试AI分析案件"""
         # Mock智能体团队

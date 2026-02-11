@@ -35,7 +35,7 @@ import { v4 as uuidv4 } from 'uuid';
 const sentimentLabels: Record<string, { label: string; color: string; icon: React.ReactNode }> = {
   positive: { label: '正面', color: 'bg-green-100 text-green-800', icon: <TrendingUp className="h-3 w-3" /> },
   negative: { label: '负面', color: 'bg-red-100 text-red-800', icon: <TrendingDown className="h-3 w-3" /> },
-  neutral: { label: '中性', color: 'bg-gray-100 text-gray-800', icon: <Minus className="h-3 w-3" /> },
+  neutral: { label: '中性', color: 'bg-muted text-foreground', icon: <Minus className="h-3 w-3" /> },
 };
 
 // 风险等级标签
@@ -319,7 +319,7 @@ export default function Sentiment() {
                 <div className="space-y-4">
                   {records.slice(0, 5).map((record) => (
                     <div key={record.id} className="flex items-start gap-3 p-3 border rounded-lg">
-                      <div className={`p-2 rounded ${sentimentLabels[record.sentiment_type]?.color || 'bg-gray-100'}`}>
+                      <div className={`p-2 rounded ${sentimentLabels[record.sentiment_type]?.color || 'bg-muted'}`}>
                         {sentimentLabels[record.sentiment_type]?.icon}
                       </div>
                       <div className="flex-1 min-w-0">
@@ -351,7 +351,7 @@ export default function Sentiment() {
                 <div className="space-y-4">
                   {alerts.slice(0, 5).map((alert) => (
                     <div key={alert.id} className="flex items-start gap-3 p-3 border rounded-lg">
-                      <div className={`p-2 rounded ${alertLabels[alert.alert_level]?.color || 'bg-gray-100'}`}>
+                      <div className={`p-2 rounded ${alertLabels[alert.alert_level]?.color || 'bg-muted'}`}>
                         <AlertTriangle className="h-4 w-4" />
                       </div>
                       <div className="flex-1 min-w-0">

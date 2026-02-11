@@ -25,8 +25,8 @@ async def test_evidence_analyst_init():
 @pytest.mark.asyncio
 async def test_evidence_processing():
     agent = EvidenceAnalystAgent()
-    # Mock chat
-    async def mock_chat(msg):
+    # Mock chat（需要接受 llm_config 等关键字参数）
+    async def mock_chat(msg, **kwargs):
         return "Mock evidence analysis"
     agent.chat = mock_chat
     

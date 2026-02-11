@@ -6,7 +6,7 @@ from fastapi import APIRouter
 
 from src.api.routes import auth, chat, cases, contracts, documents, due_diligence, knowledge, llm, lic, assets, notifications
 from src.api.routes import sentiment, collaboration, collaboration_ws, integrations, datacenter
-from src.api.routes import mcp_routes, episodic_memory
+from src.api.routes import mcp_routes, episodic_memory, skills
 
 api_router = APIRouter()
 
@@ -29,3 +29,4 @@ api_router.include_router(notifications.router, prefix="/notifications", tags=["
 api_router.include_router(integrations.router, prefix="/integrations/oa", tags=["OA集成"])
 api_router.include_router(datacenter.router, prefix="/datacenter", tags=["企业数据中心"])
 api_router.include_router(episodic_memory.router, prefix="/knowledge-center", tags=["知识中心"])
+api_router.include_router(skills.router, tags=["Skills技能管理"])

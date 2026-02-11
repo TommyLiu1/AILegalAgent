@@ -65,10 +65,10 @@ export function UserProfile({ onClose }: UserProfileProps) {
           animate={{ opacity: 1, x: 0 }}
           exit={{ opacity: 0, x: 320 }}
           onClick={(e) => e.stopPropagation()}
-          className="absolute right-0 top-0 bottom-0 w-80 bg-white shadow-2xl flex flex-col"
+          className="absolute right-0 top-0 bottom-0 w-80 bg-card shadow-2xl flex flex-col"
         >
           {/* Header */}
-          <div className="p-6 bg-[#007AFF] text-white">
+          <div className="p-6 bg-primary text-white">
             <div className="flex items-start justify-between mb-6">
               <div className="w-16 h-16 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center overflow-hidden">
                 {user?.avatar_url ? (
@@ -100,30 +100,30 @@ export function UserProfile({ onClose }: UserProfileProps) {
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: index * 0.03 }}
                     onClick={item.action}
-                    className="w-full flex items-center gap-3 p-3.5 hover:bg-[#F2F2F7] rounded-xl transition-colors text-left active:scale-98"
+                    className="w-full flex items-center gap-3 p-3.5 hover:bg-muted rounded-xl transition-colors text-left active:scale-98"
                   >
-                    <Icon className="w-5 h-5 text-[#8E8E93]" />
-                    <span className="text-sm text-[#1C1C1E] font-medium">{item.label}</span>
+                    <Icon className="w-5 h-5 text-muted-foreground" />
+                    <span className="text-sm text-foreground font-medium">{item.label}</span>
                   </motion.button>
                 );
               })}
             </div>
 
             {/* Settings */}
-            <div className="space-y-3 pt-4 border-t border-[#E5E5EA]">
-              <div className="flex items-center justify-between p-3.5 bg-[#F2F2F7] rounded-xl">
+            <div className="space-y-3 pt-4 border-t border-border">
+              <div className="flex items-center justify-between p-3.5 bg-muted rounded-xl">
                 <div className="flex items-center gap-3">
                   {darkMode ? (
-                    <Moon className="w-5 h-5 text-[#8E8E93]" />
+                    <Moon className="w-5 h-5 text-muted-foreground" />
                   ) : (
-                    <Sun className="w-5 h-5 text-[#8E8E93]" />
+                    <Sun className="w-5 h-5 text-muted-foreground" />
                   )}
-                  <span className="text-sm text-[#1C1C1E] font-medium">深色模式</span>
+                  <span className="text-sm text-foreground font-medium">深色模式</span>
                 </div>
                 <button
                   onClick={() => setDarkMode(!darkMode)}
                   className={`w-12 h-7 rounded-full transition-colors ${
-                    darkMode ? 'bg-[#34C759]' : 'bg-[#E5E5EA]'
+                    darkMode ? 'bg-success' : 'bg-border'
                   }`}
                 >
                   <motion.div
@@ -133,15 +133,15 @@ export function UserProfile({ onClose }: UserProfileProps) {
                 </button>
               </div>
 
-              <div className="flex items-center justify-between p-3.5 bg-[#F2F2F7] rounded-xl">
+              <div className="flex items-center justify-between p-3.5 bg-muted rounded-xl">
                 <div className="flex items-center gap-3">
-                  <Bell className="w-5 h-5 text-[#8E8E93]" />
-                  <span className="text-sm text-[#1C1C1E] font-medium">推送通知</span>
+                  <Bell className="w-5 h-5 text-muted-foreground" />
+                  <span className="text-sm text-foreground font-medium">推送通知</span>
                 </div>
                 <button
                   onClick={() => setNotifications(!notifications)}
                   className={`w-12 h-7 rounded-full transition-colors ${
-                    notifications ? 'bg-[#34C759]' : 'bg-[#E5E5EA]'
+                    notifications ? 'bg-success' : 'bg-border'
                   }`}
                 >
                   <motion.div
@@ -153,27 +153,27 @@ export function UserProfile({ onClose }: UserProfileProps) {
             </div>
 
             {/* Stats */}
-            <div className="grid grid-cols-3 gap-3 mt-6 pt-6 border-t border-[#E5E5EA]">
+            <div className="grid grid-cols-3 gap-3 mt-6 pt-6 border-t border-border">
               <div className="text-center">
-                <p className="text-2xl font-semibold text-[#1C1C1E]">--</p>
-                <p className="text-xs text-[#8E8E93] mt-1">进行中</p>
+                <p className="text-2xl font-semibold text-foreground">--</p>
+                <p className="text-xs text-muted-foreground mt-1">进行中</p>
               </div>
               <div className="text-center">
-                <p className="text-2xl font-semibold text-[#1C1C1E]">--</p>
-                <p className="text-xs text-[#8E8E93] mt-1">本月处理</p>
+                <p className="text-2xl font-semibold text-foreground">--</p>
+                <p className="text-xs text-muted-foreground mt-1">本月处理</p>
               </div>
               <div className="text-center">
-                <p className="text-2xl font-semibold text-[#34C759]">--</p>
-                <p className="text-xs text-[#8E8E93] mt-1">效率</p>
+                <p className="text-2xl font-semibold text-success">--</p>
+                <p className="text-xs text-muted-foreground mt-1">效率</p>
               </div>
             </div>
           </div>
 
           {/* Footer */}
-          <div className="p-4 border-t border-[#E5E5EA]">
+          <div className="p-4 border-t border-border">
             <button 
               onClick={handleLogout}
-              className="w-full flex items-center justify-center gap-2 py-3 text-[#FF3B30] hover:bg-[#FFF1F0] rounded-xl transition-colors font-medium active:scale-98"
+              className="w-full flex items-center justify-center gap-2 py-3 text-destructive hover:bg-destructive/10 rounded-xl transition-colors font-medium active:scale-98"
             >
               <LogOut className="w-5 h-5" />
               退出登录

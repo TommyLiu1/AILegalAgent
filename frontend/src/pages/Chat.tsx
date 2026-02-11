@@ -12,8 +12,9 @@
  */
 
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import { Resizable } from 're-resizable';
 import { motion, AnimatePresence } from 'framer-motion';
+import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/components/ui/resizable';
+import type { ImperativePanelHandle } from 'react-resizable-panels';
 import {
   FileText, X, Send, Paperclip, Bot, User, Sparkles, CheckCircle, Loader2,
   Lock, ShieldCheck, Cloud, HelpCircle, ChevronRight, PanelLeftClose, PanelLeftOpen,
@@ -32,7 +33,7 @@ import { LottieIcon } from '@/components/ui/LottieIcon';
 import { RightPanel } from '@/components/chat/RightPanel';
 import { StreamingMessage } from '@/components/chat/StreamingMessage';
 import { ThinkingChain } from '@/components/chat/ThinkingChain';
-import { QuickActionsBar, DeepModeToggle, type QuickActionMode } from '@/components/chat/QuickActionsBar';
+import { QuickActionsBar, DeepThinkToggle, type QuickActionMode } from '@/components/chat/QuickActionsBar';
 import { SlashCommandPalette, useSlashCommand, type SlashCommand } from '@/components/chat/SlashCommandPalette';
 import { ThinkingIndicator, type ThinkingStatus } from '@/components/chat/ThinkingIndicator';
 import { A2UIRenderer, StreamingA2UIRenderer, useStreamingA2UI } from '@/components/a2ui';
@@ -50,7 +51,15 @@ interface Message {
   memory_id?: string;
   feedback?: 'up' | 'down';
   attachment?: { type: 'file' | 'image'; name: string; size: string };
-  metadata?: { isError?: boolean; originalError?: string; lastUserMessage?: string };
+  metadata?: {
+    isError?: boolean;
+    originalError?: string;
+    lastUserMessage?: string;
+    canRetry?: boolean;
+    errorAction?: string;
+    isNotice?: boolean;
+    level?: string;
+  };
   clarification?: {
     questions: { question: string; options: string[] }[];
     original_content: string;
@@ -85,7 +94,7 @@ export default function Chat() {
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   // 内联 Agent 思考状态指示器
   const [thinkingStatus, setThinkingStatus] = useState<ThinkingStatus | null>(null);
-  // 模式切换 + 斜杠命令 + 快捷操作选中态
+  // 模式切换 + 斜杠命令
   const [quickActionMode, setQuickActionMode] = useState<QuickActionMode>('chat');
   const [activeActionId, setActiveActionId] = useState<string | null>(null);
   const [slashPaletteOpen, setSlashPaletteOpen] = useState(false);
@@ -107,6 +116,7 @@ export default function Chat() {
   // 智能滚动：用户主动向上滚动时暂停自动滚动
   const [userScrolledUp, setUserScrolledUp] = useState(false);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const rightPanelRef = useRef<ImperativePanelHandle>(null);
 
   // Refs
   const wsRef = useRef<WebSocket | null>(null);
@@ -169,7 +179,6 @@ export default function Chat() {
     setIsProcessing(false);
     setInput('');
     setPendingFile(null);
-    setActiveActionId(null);
     store.resetWorkspace();
     setTimeout(() => chatInputRef.current?.focus(), 100);
     toast.success('已创建新对话');
@@ -393,11 +402,22 @@ export default function Chat() {
     setRightPanelOpen(true);
     setChatWidth(50);
     if (tab) store.setRightPanelTab(tab);
+    // 先展开，再调整尺寸到50%
+    const panel = rightPanelRef.current;
+    if (panel) {
+      panel.expand();
+      // expand 后立即 resize 到目标尺寸
+      requestAnimationFrame(() => {
+        panel.resize(50);
+      });
+    }
   }, [store]);
 
   const closeRightPanel = useCallback(() => {
     setRightPanelOpen(false);
     setChatWidth(100);
+    // 折叠可调节面板
+    rightPanelRef.current?.collapse();
   }, []);
 
   const toggleRightPanel = useCallback(() => {
@@ -407,6 +427,13 @@ export default function Chat() {
       openRightPanel();
     }
   }, [rightPanelOpen, openRightPanel, closeRightPanel]);
+
+  // ========== 移动端切换时自动折叠右侧面板 ==========
+  useEffect(() => {
+    if (isMobile && rightPanelRef.current) {
+      rightPanelRef.current.collapse();
+    }
+  }, [isMobile]);
 
   // ========== WebSocket 消息处理（v2 — 流式 + 思考链 + Agent 结果）==========
 
@@ -515,18 +542,21 @@ export default function Chat() {
         break;
 
       // --- Agent 中间结果 → 右侧工作台 ---
-      case 'agent_result':
+      case 'agent_result': {
+        const resultContent = data.content || '';
+        if (!resultContent.trim()) break; // 跳过空结果
         store.addAgentResult({
           id: uuidv4(),
           agent: data.agent || '',
           agentKey: data.agent_key,
-          content: data.content || '',
+          content: resultContent,
           step: data.step || 0,
           totalSteps: data.total_steps || 0,
           elapsed: data.elapsed,
           timestamp: Date.now(),
         });
         break;
+      }
 
       // --- Agent 任务看板（多 Agent 并列协作） ---
       case 'agent_task_start':
@@ -658,13 +688,16 @@ export default function Chat() {
         break;
 
       // --- 流式 token ---
-      case 'content_token':
+      case 'content_token': {
+        const token = data.token || '';
+        if (!token) break; // 跳过空 token，减少不必要的重渲染
         if (!store.streamingMessageId) {
           const newId = uuidv4();
           store.startStream(newId, data.agent || '');
         }
-        store.appendStreamToken(data.token || '');
+        store.appendStreamToken(token);
         break;
+      }
 
       // --- A2UI 上下文更新 ---
       case 'context_update':
@@ -759,15 +792,21 @@ export default function Chat() {
         break;
 
       // --- Canvas 打开 ---
-      case 'canvas_open':
+      case 'canvas_open': {
+        const canvasContent = data.content || '';
+        if (!canvasContent.trim()) {
+          console.warn('[WS] canvas_open 收到空内容，跳过');
+          break;
+        }
         store.setCanvasContent({
           type: data.type || 'document',
           title: data.title || '文档',
-          content: data.content || '',
+          content: canvasContent,
           language: data.language,
         });
         openRightPanel('document');
         break;
+      }
 
       // --- Canvas AI 更新 ---
       case 'canvas_update':
@@ -828,12 +867,15 @@ export default function Chat() {
         }
         break;
 
-      // --- 文档就绪 → 工作台推送动作 + 切换签约 ---
+      // --- 文档就绪 → 自动打开文档面板 + 推送操作按钮 ---
       case 'document_ready':
+        // 无论是否签约，都打开文档面板并通知用户
+        openRightPanel('document');
         if (data.suggest_signing) {
-          openRightPanel('document');
           store.setDocumentOverlay('signing');
           toast.success('文档已就绪，可发起签约/盖章流程');
+        } else {
+          toast.success(data.title ? `「${data.title}」已生成，可在右侧文档面板查看和编辑` : '文档已生成，可在右侧面板查看');
         }
         // 同时在工作台推送相关动作
         store.addWorkspaceAction({
@@ -871,6 +913,12 @@ export default function Chat() {
       case 'agent_response': {
         setIsProcessing(false);
         setThinkingStatus(null);
+
+        // 错误完成事件：仅重置状态，不添加消息（error 事件已处理展示）
+        if (data.error) {
+          store.finalizeStream();
+          break;
+        }
 
         // A2UI 响应已通过 a2ui_message 事件插入对话流，不需要重复添加
         if (data.a2ui) {
@@ -932,6 +980,28 @@ export default function Chat() {
         toast.warning?.(data.message || '消息保存异常') ?? toast.error(data.message || '消息保存异常');
         break;
 
+      // --- 系统通知（如 API Key 无效提示） ---
+      case 'system_notice': {
+        const noticeLevel = data.level || 'info';
+        const noticeMsg = data.content || data.message || '系统通知';
+        if (noticeLevel === 'warning') {
+          toast.warning?.(noticeMsg) ?? toast.error(noticeMsg);
+        } else if (noticeLevel === 'error') {
+          toast.error(noticeMsg);
+        } else {
+          toast.info?.(noticeMsg) ?? toast(noticeMsg);
+        }
+        // 同时作为系统消息插入聊天
+        setMessages(prev => [...prev, {
+          id: uuidv4(),
+          type: 'system',
+          content: noticeMsg,
+          timestamp: new Date(),
+          metadata: { isNotice: true, level: noticeLevel },
+        }]);
+        break;
+      }
+
       // --- Canvas 保存结果 ---
       case 'canvas_saved':
         if (data.status === 'ok') {
@@ -946,28 +1016,35 @@ export default function Chat() {
         setIsProcessing(false);
         setThinkingStatus(null);
         store.finalizeStream();
-        const rawError = data.content || data.message || '发生错误';
-        // 将技术性错误转为友好提示
-        let friendlyMsg = rawError;
-        if (rawError.includes('must not be empty')) {
-          friendlyMsg = 'AI 处理时遇到问题，请重新发送您的消息。';
-        } else if (rawError.includes('API返回 4')) {
-          friendlyMsg = 'AI 服务暂时不可用，请稍后重试。';
-        } else if (rawError.includes('超时') || rawError.includes('timeout')) {
-          friendlyMsg = '处理超时，请简化问题后重试。';
-        } else if (rawError.includes('Canvas 优化失败')) {
-          friendlyMsg = 'Canvas 内容优化失败，请稍后重试。';
-        }
+        // 后端已提供用户友好的错误消息
+        const friendlyMsg = data.content || data.message || '处理过程中出现异常，请稍后重试。';
+        const canRetry = data.can_retry !== false;
+        const errorAction = data.action || 'retry';
+        const lastUserMsg = data.original_content || '';
+        
         // 在消息列表中显示可操作的错误提示
         setMessages(prev => [...prev, {
           id: uuidv4(),
           type: 'system' as const,
           content: friendlyMsg,
           timestamp: new Date(),
-          metadata: { isError: true, originalError: rawError },
+          metadata: {
+            isError: true,
+            originalError: data.detail || friendlyMsg,
+            canRetry,
+            errorAction,
+            lastUserMessage: lastUserMsg,
+          },
         }]);
         break;
       }
+
+      default:
+        // 未知事件类型，仅在开发环境下记录
+        if (process.env.NODE_ENV === 'development') {
+          console.debug(`[WS] 未处理的事件类型: ${data.type}`, data);
+        }
+        break;
     }
   }, [isMobile, store]);
 
@@ -981,13 +1058,13 @@ export default function Chat() {
 
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reconnectAttemptRef = useRef(0);
-  const maxReconnectAttempts = 5;
-  const intentionalCloseRef = useRef(false); // 标记是否为主动关闭
+  const maxReconnectAttempts = 8; // 增加到 8 次重连尝试
+  const intentionalCloseRef = useRef(false);
+  const heartbeatTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const connectWs = useCallback((convId: string) => {
     const ws = chatApi.connectWebSocket(
       convId,
-      // 始终调用最新 handler，但引用不变
       (data: any) => messageHandlerRef.current(data),
       // onError
       () => {
@@ -997,6 +1074,11 @@ export default function Chat() {
       // onClose
       (event) => {
         wsRef.current = null;
+        // 停止心跳
+        if (heartbeatTimerRef.current) {
+          clearInterval(heartbeatTimerRef.current);
+          heartbeatTimerRef.current = null;
+        }
         // 如果是主动关闭（切换对话等），不重连
         if (intentionalCloseRef.current) {
           intentionalCloseRef.current = false;
@@ -1007,9 +1089,12 @@ export default function Chat() {
           setIsProcessing(false);
           store.finalizeStream();
           if (reconnectAttemptRef.current < maxReconnectAttempts) {
-            const delay = Math.min(1000 * Math.pow(2, reconnectAttemptRef.current), 15000);
+            // 指数退避 + 随机抖动，避免大量客户端同时重连
+            const baseDelay = Math.min(1000 * Math.pow(2, reconnectAttemptRef.current), 30000);
+            const jitter = Math.random() * 1000;
+            const delay = baseDelay + jitter;
             reconnectAttemptRef.current += 1;
-            console.info(`WebSocket 断开，${delay / 1000}s 后尝试第 ${reconnectAttemptRef.current} 次重连...`);
+            console.info(`WebSocket 断开 (code=${event.code})，${(delay / 1000).toFixed(1)}s 后第 ${reconnectAttemptRef.current} 次重连...`);
             reconnectTimerRef.current = setTimeout(() => {
               if (!wsRef.current) {
                 const newWs = connectWs(convId);
@@ -1030,13 +1115,24 @@ export default function Chat() {
         }
       },
     );
-    // 连接成功后重置重连计数
+    // 连接成功后重置重连计数并启动心跳
     ws.addEventListener('open', () => {
       reconnectAttemptRef.current = 0;
+      // 启动心跳：每 25 秒发一次 ping
+      if (heartbeatTimerRef.current) clearInterval(heartbeatTimerRef.current);
+      heartbeatTimerRef.current = setInterval(() => {
+        if (ws.readyState === WebSocket.OPEN) {
+          try {
+            ws.send(JSON.stringify({ type: 'ping' }));
+          } catch {
+            // 发送失败说明连接已断
+          }
+        }
+      }, 25000);
     });
     return ws;
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // 不依赖任何变化的回调 — 通过 ref 间接引用
+  }, []);
 
   useEffect(() => {
     if (!conversationId || wsRef.current) return;
@@ -1048,6 +1144,10 @@ export default function Chat() {
         clearTimeout(reconnectTimerRef.current);
         reconnectTimerRef.current = null;
       }
+      if (heartbeatTimerRef.current) {
+        clearInterval(heartbeatTimerRef.current);
+        heartbeatTimerRef.current = null;
+      }
       reconnectAttemptRef.current = 0;
       if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
         ws.close(1000, 'component cleanup');
@@ -1055,7 +1155,7 @@ export default function Chat() {
       wsRef.current = null;
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [conversationId]); // 只在 conversationId 变化时重建连接
+  }, [conversationId]);
 
   // ========== 发送消息超时保护 ==========
 
@@ -1063,20 +1163,26 @@ export default function Chat() {
 
   useEffect(() => {
     if (isProcessing) {
-      // 90 秒超时：若后端一直无回复，自动停止 loading
+      // 180 秒超时：考虑到 LLM 重试和多 Agent 协作可能需要较长时间
       processingTimeoutRef.current = setTimeout(() => {
         setIsProcessing(false);
         store.finalizeStream();
+        const lastUserMsg = [...messages].reverse().find(m => m.type === 'user');
         setMessages(prev => [
           ...prev,
           {
             id: uuidv4(),
             type: 'system' as const,
-            content: '请求超时，服务器未在规定时间内响应。请稍后重试。',
+            content: '请求处理超时，AI 服务可能较忙。您可以点击重试。',
             timestamp: new Date(),
+            metadata: {
+              isError: true,
+              canRetry: true,
+              lastUserMessage: lastUserMsg?.content || '',
+            },
           },
         ]);
-      }, 90_000);
+      }, 180_000);
     } else {
       if (processingTimeoutRef.current) {
         clearTimeout(processingTimeoutRef.current);
@@ -1095,10 +1201,23 @@ export default function Chat() {
     const messageContent = content || input;
     if (!messageContent.trim() || isProcessing) return;
 
+    // 确保 WebSocket 连接可用
     if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
       if (conversationId) {
         wsRef.current = connectWs(conversationId);
-        await new Promise(resolve => setTimeout(resolve, 500));
+        // 等待连接建立（最多 3 秒）
+        let waitAttempts = 0;
+        while (wsRef.current?.readyState !== WebSocket.OPEN && waitAttempts < 15) {
+          await new Promise(resolve => setTimeout(resolve, 200));
+          waitAttempts++;
+        }
+        if (wsRef.current?.readyState !== WebSocket.OPEN) {
+          toast.error('无法连接到服务器，请检查网络后重试');
+          return;
+        }
+      } else {
+        toast.error('请先选择或创建一个对话');
+        return;
       }
     }
 
@@ -1114,7 +1233,7 @@ export default function Chat() {
     setMessages(prev => [...prev, userMessage]);
     setInput('');
     setPendingFile(null);
-    setActiveActionId(null); // 发送后取消快捷操作高亮
+    setActiveActionId(null); // 清除快捷操作选中态
     setIsProcessing(true);
     setUserScrolledUp(false); // 发送消息时重置滚动状态，自动跟随新内容
     store.resetWorkspace();
@@ -1176,16 +1295,20 @@ export default function Chat() {
 
   // ========== 澄清回复 ==========
 
-  const handleClarificationResponse = (originalContent: string, selections: Record<string, string>) => {
+  const handleClarificationResponse = (originalContent: string, selections: Record<string, string>, supplement?: string) => {
     if (isProcessing) return;
-    const selectionText = Object.entries(selections).map(([q, a]) => `${q}: ${a}`).join('；');
+    let selectionText = Object.entries(selections).map(([q, a]) => `${q}: ${a}`).join('；');
+    if (supplement) {
+      selectionText += `\n\n用户补充说明：${supplement}`;
+    }
     // v3 优化：不再在对话流中重复输出选择内容，直接发送到后端
     setIsProcessing(true);
     store.resetWorkspace();
     if (wsRef.current?.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify({
         type: 'clarification_response', content: selectionText,
-        original_content: originalContent, selections: selectionText, privacy_mode: mode,
+        original_content: originalContent, selections: selectionText,
+        supplement: supplement || '', privacy_mode: mode,
       }));
     }
   };
@@ -1224,10 +1347,10 @@ export default function Chat() {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(); }
   };
 
-  // 动态 placeholder — 根据功能模式切换显示不同提示文本
+  // 动态 placeholder — 根据功能模式切换显示不同提示文本（千问/豆包风格）
   const dynamicPlaceholder = useMemo(() => {
     if (pendingFile) return `描述您对「${pendingFile.name}」的需求...`;
-    if (quickActionMode === 'deep_analysis') return '描述您需要深度分析的法律问题...';
+    if (quickActionMode === 'deep_analysis') return '描述您需要深度分析的法律问题（合同/文书/研究均可）...';
     return '发送消息或输入 / 选择技能';
   }, [pendingFile, quickActionMode]);
 
@@ -1348,13 +1471,32 @@ export default function Chat() {
     }
   }, [store.conversationId, handleForwardToLawyer, handleInitiateSigning]);
 
+  // ========== 工作台补充输入 ==========
+  const handleWorkspaceSupplementInput = useCallback((text: string) => {
+    if (!text.trim() || isProcessing) return;
+    // 将补充信息作为用户消息发送到对话流
+    const userMsg: Message = {
+      id: uuidv4(), type: 'user',
+      content: text.trim(),
+      timestamp: new Date(),
+    };
+    setMessages(prev => [...prev, userMsg]);
+    setIsProcessing(true);
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({
+        type: 'chat', content: `[补充说明] ${text.trim()}`,
+        conversation_id: store.conversationId, privacy_mode: mode,
+      }));
+    }
+  }, [isProcessing, store.conversationId, mode]);
+
   // ========== 隐私提示 ==========
 
   const getPrivacyHint = () => {
     switch (mode) {
       case PrivacyMode.LOCAL: return { text: '绝密模式：数据仅在本地处理', icon: Lock, color: 'text-indigo-600' };
       case PrivacyMode.HYBRID: return { text: '安全混合：敏感数据已自动脱敏', icon: ShieldCheck, color: 'text-emerald-600' };
-      case PrivacyMode.CLOUD: return { text: '云端增强：正在使用联网模型', icon: Cloud, color: 'text-blue-600' };
+      case PrivacyMode.CLOUD: return { text: '云端增强：正在使用联网模型', icon: Cloud, color: 'text-primary' };
     }
   };
   const privacyHint = getPrivacyHint();
@@ -1472,7 +1614,7 @@ export default function Chat() {
         >
           {/* Agent 标签 */}
           {message.agent && (
-            <div className="flex items-center gap-1.5 text-[11px] font-medium text-gray-400 mb-1.5 ml-0.5">
+            <div className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground/50 mb-1.5 ml-0.5">
               <Bot className="h-3 w-3" />
               {message.agent}
             </div>
@@ -1480,7 +1622,7 @@ export default function Chat() {
 
           {/* 文本内容（如果有） */}
           {message.content && (
-            <div className="bg-white border border-gray-100 text-[#1C1C1E] px-4 py-3 rounded-2xl rounded-bl-md shadow-sm mb-2">
+            <div className="bg-card border border-border text-foreground px-4 py-3 rounded-2xl rounded-bl-md shadow-sm mb-2">
               <div className="prose prose-sm max-w-none">
                 <ReactMarkdown>{message.content}</ReactMarkdown>
               </div>
@@ -1507,7 +1649,7 @@ export default function Chat() {
 
           {/* 时间戳 */}
           <div className="flex items-center gap-2 mt-1.5 ml-0.5 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-            <span className="text-[10px] text-gray-300">
+            <span className="text-[10px] text-muted-foreground/40">
               {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
             </span>
           </div>
@@ -1531,6 +1673,9 @@ export default function Chat() {
     // 系统消息 — 居中提示条（错误消息带重试按钮）
     if (message.type === 'system') {
       const isErr = message.metadata?.isError;
+      const canRetry = (message.metadata as any)?.canRetry !== false;
+      const retryContent = (message.metadata as any)?.lastUserMessage
+        || [...messages].reverse().find(m => m.type === 'user')?.content;
       return (
         <motion.div
           key={message.id}
@@ -1541,19 +1686,16 @@ export default function Chat() {
           <div className={`text-[11px] mx-auto font-medium px-4 py-1.5 rounded-full flex items-center gap-2 ${
             isErr
               ? 'bg-red-50 text-red-600 border border-red-200'
-              : 'bg-[#FFF8ED] text-[#FF9500] border border-[#FFD19A]'
+              : 'bg-warning-light text-warning border border-warning/30'
           }`}>
             <span>{message.content}</span>
-            {isErr && (
+            {isErr && canRetry && retryContent && (
               <button
                 onClick={() => {
-                  // 找到最后一条用户消息重新发送
-                  const lastUserMsg = [...messages].reverse().find(m => m.type === 'user');
-                  if (lastUserMsg) {
-                    handleSendMessage(lastUserMsg.content);
-                  }
+                  handleSendMessage(retryContent);
                 }}
-                className="ml-1 px-2 py-0.5 bg-red-100 hover:bg-red-200 text-red-700 rounded-full text-[10px] font-semibold transition-colors"
+                disabled={isProcessing}
+                className="ml-1 px-2 py-0.5 bg-red-100 hover:bg-red-200 text-red-700 rounded-full text-[10px] font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 重试
               </button>
@@ -1575,7 +1717,7 @@ export default function Chat() {
         <div className={`max-w-[85%] ${isUser ? '' : ''}`}>
           {/* AI 消息 — Agent 标签 */}
           {!isUser && message.agent && (
-            <div className="flex items-center gap-1.5 text-[11px] font-medium text-gray-400 mb-1.5 ml-0.5">
+            <div className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground/50 mb-1.5 ml-0.5">
               <Bot className="h-3 w-3" />
               {message.agent}
             </div>
@@ -1584,21 +1726,21 @@ export default function Chat() {
           {/* 消息气泡 */}
           <div className={`rounded-2xl leading-relaxed text-sm ${
             isUser
-              ? 'bg-[#007AFF] text-white px-4 py-2.5 rounded-br-md'
-              : 'bg-white border border-gray-100 text-[#1C1C1E] px-4 py-3 rounded-bl-md shadow-sm'
+              ? 'bg-primary text-white px-4 py-2.5 rounded-br-md'
+              : 'bg-card border border-border text-foreground px-4 py-3 rounded-bl-md shadow-sm'
           }`}>
             {/* 附件 */}
             {message.attachment && (
               <div className={`flex items-center gap-2.5 mb-2.5 p-2 rounded-lg ${
-                isUser ? 'bg-white/15' : 'bg-gray-50 border border-gray-100'
+                isUser ? 'bg-card/15' : 'bg-muted border border-border'
               }`}>
-                <div className={`p-1.5 rounded ${isUser ? 'bg-white/20' : 'bg-white shadow-sm'}`}>
-                  <FileText className={`w-4 h-4 ${isUser ? 'text-white' : 'text-blue-600'}`} />
+                <div className={`p-1.5 rounded ${isUser ? 'bg-card/20' : 'bg-card shadow-sm'}`}>
+                  <FileText className={`w-4 h-4 ${isUser ? 'text-white' : 'text-primary'}`} />
                 </div>
                 <div className="flex flex-col min-w-0">
                   <span className="text-xs font-medium truncate">{message.attachment.name}</span>
                   {message.attachment.size && (
-                    <span className={`text-[10px] ${isUser ? 'text-white/70' : 'text-gray-400'}`}>{message.attachment.size}</span>
+                    <span className={`text-[10px] ${isUser ? 'text-white/70' : 'text-muted-foreground/50'}`}>{message.attachment.size}</span>
                   )}
                 </div>
               </div>
@@ -1608,7 +1750,7 @@ export default function Chat() {
             {isUser ? (
               <p className="whitespace-pre-wrap">{message.content}</p>
             ) : (
-              <div className="prose prose-sm max-w-none prose-headings:text-[#1C1C1E] prose-headings:font-semibold prose-p:text-[#1C1C1E] prose-p:leading-relaxed prose-strong:text-[#1C1C1E] prose-ul:text-[#3C3C43] prose-ol:text-[#3C3C43] prose-code:bg-gray-50 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:text-[13px] prose-pre:bg-gray-900 prose-pre:text-gray-100">
+              <div className="prose prose-sm max-w-none prose-headings:text-foreground prose-headings:font-semibold prose-p:text-foreground prose-p:leading-relaxed prose-strong:text-foreground prose-ul:text-foreground/80 prose-ol:text-foreground/80 prose-code:bg-muted prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:text-[13px] prose-pre:bg-gray-900 prose-pre:text-gray-100">
                 <ReactMarkdown>{message.content}</ReactMarkdown>
               </div>
             )}
@@ -1638,7 +1780,7 @@ export default function Chat() {
           {/* AI 消息底部操作栏 — 始终显示但淡入 */}
           {!isUser && (
             <div className="flex items-center gap-2 mt-1.5 ml-0.5 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-              <span className="text-[10px] text-gray-300">
+              <span className="text-[10px] text-muted-foreground/40">
                 {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
               </span>
               {message.memory_id && (
@@ -1646,8 +1788,8 @@ export default function Chat() {
                   <button
                     onClick={() => handleFeedback(message, 5)}
                     disabled={!!message.feedback}
-                    className={`p-1 rounded-md hover:bg-gray-100 transition-colors ${
-                      message.feedback === 'up' ? 'text-green-500' : 'text-gray-300 hover:text-green-500'
+                    className={`p-1 rounded-md hover:bg-muted transition-colors ${
+                      message.feedback === 'up' ? 'text-green-500' : 'text-muted-foreground/40 hover:text-green-500'
                     }`}
                     title="有帮助"
                   >
@@ -1656,8 +1798,8 @@ export default function Chat() {
                   <button
                     onClick={() => handleFeedback(message, 1)}
                     disabled={!!message.feedback}
-                    className={`p-1 rounded-md hover:bg-gray-100 transition-colors ${
-                      message.feedback === 'down' ? 'text-red-500' : 'text-gray-300 hover:text-red-500'
+                    className={`p-1 rounded-md hover:bg-muted transition-colors ${
+                      message.feedback === 'down' ? 'text-red-500' : 'text-muted-foreground/40 hover:text-red-500'
                     }`}
                     title="需改进"
                   >
@@ -1675,7 +1817,7 @@ export default function Chat() {
   // ========== JSX ==========
 
   return (
-    <div className="h-full flex bg-gray-50/50 relative">
+    <div className="h-full flex bg-muted/50 relative">
       {/* ========== 左侧对话列表侧边栏 ========== */}
       <AnimatePresence>
         {chatSidebarOpen && (
@@ -1684,32 +1826,32 @@ export default function Chat() {
             animate={{ width: 280, opacity: 1 }}
             exit={{ width: 0, opacity: 0 }}
             transition={{ duration: 0.2, ease: 'easeInOut' }}
-            className="h-full flex-shrink-0 bg-white flex flex-col overflow-hidden border-r border-gray-200"
+            className="h-full flex-shrink-0 bg-card flex flex-col overflow-hidden border-r border-border"
           >
-            <div className="p-3 flex flex-col gap-2 border-b border-gray-100">
+            <div className="p-3 flex flex-col gap-2 border-b border-border">
               <div className="flex items-center justify-between">
                 {!batchMode ? (
                   <>
                     <button onClick={handleNewConversation}
-                      className="flex items-center gap-2 px-3 py-2 text-sm font-medium bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors flex-1 mr-2 shadow-sm">
+                      className="flex items-center gap-2 px-3 py-2 text-sm font-medium bg-primary hover:bg-primary/90 text-white rounded-lg transition-colors flex-1 mr-2 shadow-sm">
                       <Plus className="w-4 h-4" /> 新建对话
                     </button>
                     <button onClick={handleToggleBatchMode}
-                      className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="批量管理">
+                      className="p-2 text-muted-foreground/50 hover:text-primary hover:bg-primary/10 rounded-lg transition-colors" title="批量管理">
                       <CheckSquare className="w-4 h-4" />
                     </button>
                     <button onClick={() => setChatSidebarOpen(false)}
-                      className="p-2 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors" title="收起侧边栏">
+                      className="p-2 text-muted-foreground/50 hover:text-foreground hover:bg-muted rounded-lg transition-colors" title="收起侧边栏">
                       <PanelLeftClose className="w-4 h-4" />
                     </button>
                   </>
                 ) : (
                   <>
-                    <span className="text-sm font-medium text-gray-700 flex-1">
+                    <span className="text-sm font-medium text-foreground flex-1">
                       已选 {selectedConvIds.size} / {conversations.length}
                     </span>
                     <button onClick={handleToggleBatchMode}
-                      className="p-2 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors" title="取消">
+                      className="p-2 text-muted-foreground/50 hover:text-foreground hover:bg-muted rounded-lg transition-colors" title="取消">
                       <XCircle className="w-4 h-4" />
                     </button>
                   </>
@@ -1718,7 +1860,7 @@ export default function Chat() {
               {batchMode && (
                 <div className="flex items-center gap-2">
                   <button onClick={handleSelectAll}
-                    className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg border border-gray-200 transition-colors">
+                    className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-lg border border-border transition-colors">
                     {selectedConvIds.size === conversations.length ? (
                       <><CheckSquare className="w-3.5 h-3.5" /> 取消全选</>
                     ) : (
@@ -1740,10 +1882,10 @@ export default function Chat() {
 
             <div className="flex-1 overflow-y-auto py-2">
               {conversations.length === 0 ? (
-                <div className="text-center text-gray-400 text-sm mt-8 px-4">
+                <div className="text-center text-muted-foreground/50 text-sm mt-8 px-4">
                   <MessageSquare className="w-8 h-8 mx-auto mb-2 opacity-30" />
-                  <p className="text-gray-500">暂无对话记录</p>
-                  <p className="text-xs mt-1 text-gray-400">开始新对话后将在此处显示</p>
+                  <p className="text-muted-foreground">暂无对话记录</p>
+                  <p className="text-xs mt-1 text-muted-foreground/50">开始新对话后将在此处显示</p>
                 </div>
               ) : conversations.map((conv) => {
                 const isActive = conv.id === conversationId;
@@ -1755,8 +1897,8 @@ export default function Chat() {
                       batchMode && isSelected
                         ? 'bg-red-50 text-red-700 border border-red-200'
                         : isActive && !batchMode
-                        ? 'bg-blue-50 text-blue-700 border border-blue-100'
-                        : 'text-gray-700 hover:bg-gray-50 border border-transparent'
+                        ? 'bg-primary/10 text-primary border border-primary/20'
+                        : 'text-foreground hover:bg-muted border border-transparent'
                     }`}>
                     <div className="flex items-center gap-3 px-3 py-2.5">
                       {batchMode ? (
@@ -1764,24 +1906,24 @@ export default function Chat() {
                           {isSelected ? (
                             <CheckSquare className="w-4 h-4 text-red-500" />
                           ) : (
-                            <Square className="w-4 h-4 text-gray-400" />
+                            <Square className="w-4 h-4 text-muted-foreground/50" />
                           )}
                         </div>
                       ) : (
-                        <MessageSquare className={`w-4 h-4 flex-shrink-0 ${isActive ? 'text-blue-500' : 'text-gray-400'}`} />
+                        <MessageSquare className={`w-4 h-4 flex-shrink-0 ${isActive ? 'text-primary' : 'text-muted-foreground/50'}`} />
                       )}
                       <div className="flex-1 min-w-0">
                         {isEditing && !batchMode ? (
                           <input ref={editInputRef} value={editingTitle} onChange={(e) => setEditingTitle(e.target.value)}
                             onBlur={handleFinishRename} onKeyDown={(e) => { if (e.key === 'Enter') handleFinishRename(); if (e.key === 'Escape') setEditingConvId(null); }}
                             onClick={(e) => e.stopPropagation()}
-                            className="w-full bg-white text-gray-800 text-sm px-2 py-0.5 rounded border border-blue-300 focus:outline-none focus:border-blue-500" />
+                            className="w-full bg-card text-foreground text-sm px-2 py-0.5 rounded border border-primary/40 focus:outline-none focus:border-primary" />
                         ) : (
                           <>
                             <p className={`text-sm truncate font-medium ${
-                              batchMode && isSelected ? 'text-red-700' : isActive && !batchMode ? 'text-blue-700' : 'text-gray-800'
+                              batchMode && isSelected ? 'text-red-700' : isActive && !batchMode ? 'text-primary' : 'text-foreground'
                             }`}>{conv.title || '未命名对话'}</p>
-                            <p className="text-[10px] text-gray-400 mt-0.5">
+                            <p className="text-[10px] text-muted-foreground/50 mt-0.5">
                               {formatConvDate(conv.last_message_at || conv.created_at)}
                               {conv.message_count > 0 && ` · ${conv.message_count}条`}
                             </p>
@@ -1791,7 +1933,7 @@ export default function Chat() {
                       {!isEditing && !batchMode && (
                         <div className={`flex items-center gap-0.5 ${isActive ? 'visible' : 'invisible group-hover:visible'}`}>
                           <button onClick={(e) => { e.stopPropagation(); setMenuOpenId(menuOpenId === conv.id ? null : conv.id); }}
-                            className="p-1 text-gray-400 hover:text-gray-700 hover:bg-gray-200/60 rounded transition-colors">
+                            className="p-1 text-muted-foreground/50 hover:text-foreground hover:bg-muted rounded transition-colors">
                             <MoreHorizontal className="w-3.5 h-3.5" />
                           </button>
                         </div>
@@ -1800,8 +1942,8 @@ export default function Chat() {
                     <AnimatePresence>
                       {!batchMode && menuOpenId === conv.id && (
                         <motion.div initial={{ opacity: 0, y: -5, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -5, scale: 0.95 }}
-                          className="absolute right-2 top-full z-50 bg-white border border-gray-200 rounded-lg shadow-lg py-1 min-w-[120px]" onClick={(e) => e.stopPropagation()}>
-                          <button onClick={(e) => handleStartRename(conv, e)} className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-gray-600 hover:text-gray-900 hover:bg-gray-50">
+                          className="absolute right-2 top-full z-50 bg-card border border-border rounded-lg shadow-lg py-1 min-w-[120px]" onClick={(e) => e.stopPropagation()}>
+                          <button onClick={(e) => handleStartRename(conv, e)} className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-muted">
                             <Pencil className="w-3 h-3" /> 重命名
                           </button>
                           <button onClick={(e) => handleDeleteConversation(conv.id, e)} className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-red-500 hover:text-red-600 hover:bg-red-50">
@@ -1814,8 +1956,8 @@ export default function Chat() {
                 );
               })}
             </div>
-            <div className="p-3 border-t border-gray-100 text-center">
-              <p className="text-[10px] text-gray-400">共 {conversations.length} 个对话</p>
+            <div className="p-3 border-t border-border text-center">
+              <p className="text-[10px] text-muted-foreground/50">共 {conversations.length} 个对话</p>
             </div>
           </motion.div>
         )}
@@ -1823,22 +1965,22 @@ export default function Chat() {
 
       {/* ========== 主内容区 ========== */}
       <div className="flex-1 flex flex-col min-w-0 relative">
-        <div className="flex-1 flex overflow-hidden">
-          {/* 左侧聊天区 — 自适应宽度 */}
+        <ResizablePanelGroup direction="horizontal" className="flex-1">
+          {/* 左侧聊天区 — 可调节宽度 */}
+          <ResizablePanel defaultSize={100} minSize={30}>
           <div
-            className="flex flex-col bg-white transition-all duration-300 ease-in-out"
-            style={{ width: rightPanelOpen && !isMobile ? '50%' : '100%', minWidth: 0 }}
+            className="flex flex-col bg-card h-full"
           >
             {/* Header — v3 紧凑版 */}
-            <div className="px-4 py-2 border-b border-[#E5E5EA] flex items-center gap-2.5 bg-white/80 backdrop-blur-sm">
+            <div className="px-4 py-2 border-b border-border flex items-center gap-2.5 bg-card/80 backdrop-blur-sm">
               {!chatSidebarOpen && (
                 <button onClick={() => setChatSidebarOpen(true)}
-                  className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors" title="展开对话列表">
+                  className="p-1.5 text-muted-foreground/50 hover:text-foreground hover:bg-muted rounded-lg transition-colors" title="展开对话列表">
                   <PanelLeftOpen className="w-4.5 h-4.5" />
                 </button>
               )}
               <div className="flex items-center gap-2">
-                <span className="font-bold text-base text-gray-800">AI 法务助手</span>
+                <span className="font-bold text-base text-foreground">AI 法务助手</span>
                 <span className="flex items-center gap-1 text-[10px] text-green-600 bg-green-50 px-1.5 py-0.5 rounded-full font-medium border border-green-100">
                   <div className="w-1.5 h-1.5 bg-green-500 rounded-full" />
                   在线
@@ -1846,7 +1988,7 @@ export default function Chat() {
               </div>
               <div className="flex-1" />
               <button onClick={handleNewConversation}
-                className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="新建对话">
+                className="p-1.5 text-muted-foreground/50 hover:text-primary hover:bg-primary/10 rounded-lg transition-colors" title="新建对话">
                 <Plus className="w-4.5 h-4.5" />
               </button>
               {/* 工作台/文档面板切换 */}
@@ -1855,8 +1997,8 @@ export default function Chat() {
                   onClick={toggleRightPanel}
                   className={`p-1.5 rounded-lg transition-colors ${
                     rightPanelOpen
-                      ? 'text-blue-600 bg-blue-50 hover:bg-blue-100'
-                      : 'text-gray-400 hover:text-gray-700 hover:bg-gray-100'
+                      ? 'text-primary bg-primary/10 hover:bg-primary/20'
+                      : 'text-muted-foreground/50 hover:text-foreground hover:bg-muted'
                   }`}
                   title={rightPanelOpen ? '收起工作台' : '展开工作台'}
                 >
@@ -1865,12 +2007,15 @@ export default function Chat() {
               )}
             </div>
 
+            {/* ========== 消息区 + 输入区 垂直可调节 ========== */}
+            <ResizablePanelGroup direction="vertical" className="flex-1">
+            <ResizablePanel defaultSize={75} minSize={25}>
             {/* Messages — 移动端额外底部内边距防止 BottomActionBar 遮挡 */}
-            <div ref={messagesContainerRef} className={`flex-1 overflow-y-auto p-4 md:p-8 space-y-6 scroll-smooth ${isMobile ? 'pb-20' : ''}`}>
+            <div ref={messagesContainerRef} className={`h-full overflow-y-auto p-4 md:p-8 space-y-6 scroll-smooth ${isMobile ? 'pb-20' : ''}`}>
               {isLoadingHistory && (
                 <div className="flex items-center justify-center py-8">
-                  <Loader2 className="w-5 h-5 animate-spin text-[#8E8E93] mr-2" />
-                  <span className="text-sm text-[#8E8E93]">正在加载对话历史...</span>
+                  <Loader2 className="w-5 h-5 animate-spin text-muted-foreground mr-2" />
+                  <span className="text-sm text-muted-foreground">正在加载对话历史...</span>
                 </div>
               )}
               {messages.map(renderMessage)}
@@ -1910,9 +2055,9 @@ export default function Chat() {
                     <ThinkingIndicator status={thinkingStatus} />
                   ) : store.thinkingSteps.length === 0 ? (
                     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex justify-start">
-                      <div className="bg-[#F2F2F7] rounded-2xl px-4 py-3 flex items-center gap-2">
-                        <Loader2 className="w-4 h-4 animate-spin text-[#8E8E93]" />
-                        <span className="text-sm text-[#8E8E93]">AI 正在思考...</span>
+                      <div className="bg-muted rounded-xl px-4 py-3 flex items-center gap-2">
+                        <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+                        <span className="text-sm text-muted-foreground">AI 正在思考...</span>
                       </div>
                     </motion.div>
                   ) : null}
@@ -1932,27 +2077,32 @@ export default function Chat() {
                     setUserScrolledUp(false);
                     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
                   }}
-                  className="absolute bottom-20 left-1/2 -translate-x-1/2 z-10 flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white text-xs font-medium rounded-full shadow-lg hover:bg-blue-700 transition-colors"
+                  className="absolute bottom-20 left-1/2 -translate-x-1/2 z-10 flex items-center gap-1.5 px-3 py-1.5 bg-primary text-white text-xs font-medium rounded-full shadow-lg hover:bg-primary/90 transition-colors"
                 >
                   <ArrowDown className="w-3.5 h-3.5" />
                   回到最新
                 </motion.button>
               )}
             </AnimatePresence>
+            </ResizablePanel>
 
-            {/* Input Area — v3 豆包风格 */}
-            <div className="p-3 bg-white border-t border-[#E5E5EA]">
-              <div className="max-w-4xl mx-auto">
+            {/* 垂直拖拽手柄 — 消息区与输入区之间 */}
+            <ResizableHandle withHandle />
+
+            <ResizablePanel defaultSize={25} minSize={10} maxSize={50}>
+            {/* Input Area — v3 豆包风格，flex 布局使 textarea 跟随面板高度自适应 */}
+            <div className="px-3 py-3 bg-card border-t border-border h-full flex flex-col min-w-0">
+              <div className="w-full min-w-0 flex-1 flex flex-col min-h-0 overflow-y-auto overflow-x-hidden">
                 <AnimatePresence>
                   {pendingFile && (
                     <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="mb-2">
-                      <div className="flex items-center gap-2.5 px-3 py-2 bg-blue-50/70 border border-blue-100 rounded-xl">
-                        <div className="bg-white p-1 rounded shadow-sm"><FileText className="w-3.5 h-3.5 text-blue-600" /></div>
+                      <div className="flex items-center gap-2.5 px-3 py-2 bg-primary/10/70 border border-primary/20 rounded-xl">
+                        <div className="bg-card p-1 rounded shadow-sm"><FileText className="w-3.5 h-3.5 text-primary" /></div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-xs font-medium text-gray-800 truncate">{pendingFile.name}</p>
-                          <p className="text-[10px] text-gray-400">{(pendingFile.size / 1024).toFixed(1)} KB</p>
+                          <p className="text-xs font-medium text-foreground truncate">{pendingFile.name}</p>
+                          <p className="text-[10px] text-muted-foreground/50">{(pendingFile.size / 1024).toFixed(1)} KB</p>
                         </div>
-                        <button onClick={() => setPendingFile(null)} className="p-0.5 text-gray-400 hover:text-red-500 rounded">
+                        <button onClick={() => setPendingFile(null)} className="p-0.5 text-muted-foreground/50 hover:text-red-500 rounded">
                           <X className="w-3.5 h-3.5" />
                         </button>
                       </div>
@@ -1960,11 +2110,27 @@ export default function Chat() {
                   )}
                 </AnimatePresence>
 
-                {/* 快捷操作工具栏 — 常驻输入框上方 */}
+                {/* 快捷操作标签栏 — 常驻输入框上方 */}
                 <QuickActionsBar
-                  onFillInput={(text: string, actionId?: string) => {
+                  onFillInput={(text) => {
                     setInput(text);
-                    setActiveActionId(actionId ?? null);
+                    // 通过 query 文本反查 action id 来设置选中态 + 自动切换模式
+                    const ACTION_MODE_MAP: Record<string, { id: string; query: string; mode: QuickActionMode }> = {
+                      '我想咨询一个法律问题：': { id: 'qa-consult', query: '我想咨询一个法律问题：', mode: 'chat' },
+                      '请帮我审查这份合同：':   { id: 'qa-contract', query: '请帮我审查这份合同：', mode: 'deep_analysis' },
+                      '请帮我起草一份':         { id: 'qa-draft', query: '请帮我起草一份', mode: 'deep_analysis' },
+                      '请帮我做风险评估：':     { id: 'qa-risk', query: '请帮我做风险评估：', mode: 'deep_analysis' },
+                      '请帮我做尽职调查，目标公司：': { id: 'qa-dd', query: '请帮我做尽职调查，目标公司：', mode: 'deep_analysis' },
+                      '我有一个劳动人事问题：': { id: 'qa-labor', query: '我有一个劳动人事问题：', mode: 'chat' },
+                      '请帮我解读以下法规政策：': { id: 'qa-regulation', query: '请帮我解读以下法规政策：', mode: 'deep_analysis' },
+                      '请帮我分析诉讼策略：':   { id: 'qa-litigation', query: '请帮我分析诉讼策略：', mode: 'deep_analysis' },
+                    };
+                    const matched = ACTION_MODE_MAP[text];
+                    setActiveActionId(matched?.id || null);
+                    // 自动切换到对应功能模式，让后端获取正确的 mode 上下文
+                    if (matched?.mode) {
+                      setQuickActionMode(matched.mode);
+                    }
                     // 填充后自动聚焦输入框，光标移到末尾
                     setTimeout(() => {
                       const el = chatInputRef.current;
@@ -1979,8 +2145,8 @@ export default function Chat() {
                   activeActionId={activeActionId}
                 />
 
-                {/* 输入框容器 — 一体式设计 */}
-                <div className="relative flex items-end bg-[#F5F5F7] rounded-2xl border border-gray-200 focus-within:border-[#007AFF] focus-within:ring-2 focus-within:ring-blue-100 transition-all">
+                {/* 输入框容器 — 一体式设计，flex-1 填充剩余高度，min-w-0 随模块宽度收缩；模式仅通过框内「深度思考」切换 */}
+                <div className="relative flex items-end flex-1 min-h-0 min-w-0 bg-muted rounded-xl border border-border focus-within:border-primary focus-within:ring-2 focus-within:ring-ring/20 transition-all">
                   {/* 斜杠命令面板 — 输入框上方浮层 */}
                   <SlashCommandPalette
                     inputValue={input}
@@ -2010,7 +2176,7 @@ export default function Chat() {
                     }}
                     accept=".pdf,.doc,.docx,.txt,image/*" />
                   <button onClick={() => fileInputRef.current?.click()} disabled={isProcessing}
-                    className="p-2.5 text-gray-400 hover:text-blue-500 transition-colors disabled:opacity-50 flex-shrink-0"
+                    className="p-2.5 text-muted-foreground/50 hover:text-primary transition-colors disabled:opacity-50 flex-shrink-0"
                     title="上传文件">
                     <Paperclip className="w-4.5 h-4.5" />
                   </button>
@@ -2021,40 +2187,38 @@ export default function Chat() {
                     value={input}
                     onChange={(e) => {
                       setInput(e.target.value);
-                      // 用户手动编辑/清空输入框时取消快捷操作高亮
-                      if (!e.target.value.trim()) setActiveActionId(null);
+                      // 用户手动编辑时清除快捷操作选中态
+                      if (activeActionId) setActiveActionId(null);
                     }}
                     onKeyPress={handleKeyPress}
                     placeholder={dynamicPlaceholder}
-                    className="flex-1 py-2.5 bg-transparent border-none resize-none focus:outline-none text-[#1C1C1E] placeholder:text-[#AEAEB2] text-sm leading-relaxed"
-                    style={{ minHeight: '40px', maxHeight: '120px' }}
+                    className="flex-1 self-stretch min-w-0 py-2.5 bg-transparent border-none resize-none focus:outline-none text-foreground placeholder:text-muted-foreground/70 text-sm leading-relaxed"
+                    style={{ minHeight: '40px' }}
                     disabled={isProcessing}
                     rows={1}
                   />
 
-                  {/* 右侧功能按钮组：深度思考 + 发送 */}
-                  <div className="flex items-center gap-0.5 flex-shrink-0">
-                    {/* 深度思考开关 — 输入框内右侧 */}
-                    <DeepModeToggle
-                      isActive={quickActionMode === 'deep_analysis'}
-                      onToggle={() => setQuickActionMode(prev => prev === 'deep_analysis' ? 'chat' : 'deep_analysis')}
-                      disabled={isProcessing}
-                    />
-                    {/* 分隔线 */}
-                    <div className="w-px h-5 bg-gray-200 mx-0.5" />
-                    {/* 发送按钮 */}
-                    <button
-                      onClick={() => handleSendMessage()}
-                      disabled={!input.trim() || isProcessing}
-                      className={`p-2 m-1 rounded-xl transition-all disabled:opacity-30 flex-shrink-0 ${
-                        input.trim()
-                          ? 'bg-[#007AFF] text-white hover:bg-[#0051D5] active:scale-95 shadow-sm'
-                          : 'bg-transparent text-gray-300'
-                      }`}
-                    >
-                      {isProcessing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-                    </button>
-                  </div>
+                  {/* 深度思考开关 — 输入框内右侧 */}
+                  <DeepThinkToggle
+                    isActive={quickActionMode === 'deep_analysis'}
+                    onToggle={() => setQuickActionMode(
+                      quickActionMode === 'deep_analysis' ? 'chat' : 'deep_analysis'
+                    )}
+                    disabled={isProcessing}
+                  />
+
+                  {/* 发送按钮 */}
+                  <button
+                    onClick={() => handleSendMessage()}
+                    disabled={!input.trim() || isProcessing}
+                    className={`p-2 m-1 rounded-xl transition-all disabled:opacity-30 flex-shrink-0 ${
+                      input.trim()
+                        ? 'bg-primary text-primary-foreground hover:bg-primary/90 active:scale-95 shadow-sm'
+                        : 'bg-transparent text-muted-foreground/40'
+                    }`}
+                  >
+                    {isProcessing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                  </button>
                 </div>
 
                 {/* 底部提示 — 更简洁 */}
@@ -2066,22 +2230,30 @@ export default function Chat() {
                 </div>
               </div>
             </div>
+            </ResizablePanel>
+            </ResizablePanelGroup>
           </div>
+          </ResizablePanel>
 
-          {/* ========== 右侧面板 — 默认收起,任务触发展开 ========== */}
-          <AnimatePresence>
-            {!isMobile && rightPanelOpen && (
-              <motion.div
-                initial={{ width: 0, opacity: 0 }}
-                animate={{ width: '50%', opacity: 1 }}
-                exit={{ width: 0, opacity: 0 }}
-                transition={{ duration: 0.3, ease: 'easeInOut' }}
-                className="bg-[#F2F2F7] overflow-hidden border-l border-[#E5E5EA] relative"
-              >
+          {/* ========== 水平拖拽手柄 — 聊天区与工作台之间 ========== */}
+          <ResizableHandle withHandle className={isMobile ? 'opacity-0 pointer-events-none w-0' : undefined} />
+
+          {/* ========== 右侧面板 — 可调节宽度，可折叠 ========== */}
+          <ResizablePanel
+            ref={rightPanelRef}
+            defaultSize={0}
+            collapsible
+            collapsedSize={0}
+            minSize={20}
+            onCollapse={() => { setRightPanelOpen(false); setChatWidth(100); }}
+            onExpand={() => { setRightPanelOpen(true); setChatWidth(50); }}
+          >
+            {!isMobile && (
+              <div className="bg-muted h-full overflow-hidden border-l border-border relative">
                 {/* 关闭按钮 */}
                 <button
                   onClick={closeRightPanel}
-                  className="absolute top-2 right-2 z-10 p-1 text-gray-400 hover:text-gray-600 hover:bg-white/60 rounded-lg transition-colors"
+                  className="absolute top-2 right-2 z-10 p-1 text-muted-foreground/50 hover:text-muted-foreground hover:bg-card/60 rounded-lg transition-colors"
                   title="收起面板"
                 >
                   <X className="w-4 h-4" />
@@ -2108,11 +2280,12 @@ export default function Chat() {
                   analysisData={store.analysisData}
                   onWorkspaceConfirm={handleWorkspaceConfirm}
                   onWorkspaceAction={handleWorkspaceAction}
+                  onSupplementInput={handleWorkspaceSupplementInput}
                 />
-              </motion.div>
+              </div>
             )}
-          </AnimatePresence>
-        </div>
+          </ResizablePanel>
+        </ResizablePanelGroup>
 
         {/* Mobile Panel — 底部抽屉（从底部滑入，覆盖 80% 高度） */}
         <AnimatePresence>
@@ -2132,18 +2305,18 @@ export default function Chat() {
                 animate={{ y: 0 }}
                 exit={{ y: '100%' }}
                 transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-                className="fixed bottom-0 left-0 right-0 z-50 bg-white flex flex-col rounded-t-2xl shadow-2xl"
+                className="fixed bottom-0 left-0 right-0 z-50 bg-card flex flex-col rounded-t-2xl shadow-2xl"
                 style={{ maxHeight: '85vh' }}
               >
                 {/* 拖拽指示器 */}
                 <div className="flex justify-center pt-3 pb-1">
-                  <div className="w-10 h-1 bg-gray-300 rounded-full" />
+                  <div className="w-10 h-1 bg-border rounded-full" />
                 </div>
-                <div className="px-4 pb-2 flex justify-between items-center border-b border-gray-100">
-                  <h3 className="font-bold text-base text-gray-800">工作台</h3>
+                <div className="px-4 pb-2 flex justify-between items-center border-b border-border">
+                  <h3 className="font-bold text-base text-foreground">工作台</h3>
                   <button
                     onClick={() => setShowContextPanel(false)}
-                    className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg"
+                    className="p-1.5 text-muted-foreground/50 hover:text-muted-foreground hover:bg-muted rounded-lg"
                   >
                     <X className="w-5 h-5" />
                   </button>
@@ -2171,6 +2344,7 @@ export default function Chat() {
                     analysisData={store.analysisData}
                     onWorkspaceConfirm={handleWorkspaceConfirm}
                     onWorkspaceAction={handleWorkspaceAction}
+                    onSupplementInput={handleWorkspaceSupplementInput}
                   />
                 </div>
               </motion.div>
@@ -2185,17 +2359,17 @@ export default function Chat() {
               className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm"
               onClick={() => setDeleteConfirmId(null)}>
               <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }}
-                className="bg-white rounded-2xl shadow-2xl p-6 w-80 mx-4" onClick={(e) => e.stopPropagation()}>
+                className="bg-card rounded-2xl shadow-2xl p-6 w-80 mx-4" onClick={(e) => e.stopPropagation()}>
                 <div className="flex items-center gap-3 mb-4">
                   <div className="p-2 bg-red-50 rounded-full"><Trash2 className="w-5 h-5 text-red-500" /></div>
-                  <h3 className="text-lg font-semibold text-gray-800">确认删除</h3>
+                  <h3 className="text-lg font-semibold text-foreground">确认删除</h3>
                 </div>
-                <p className="text-sm text-gray-500 mb-6">
+                <p className="text-sm text-muted-foreground mb-6">
                   确定要删除这个对话吗？删除后将无法恢复。
                 </p>
                 <div className="flex gap-3 justify-end">
                   <button onClick={() => setDeleteConfirmId(null)}
-                    className="px-4 py-2 text-sm font-medium text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors">
+                    className="px-4 py-2 text-sm font-medium text-muted-foreground bg-muted rounded-lg hover:bg-muted/80 transition-colors">
                     取消
                   </button>
                   <button onClick={confirmDeleteConversation}
@@ -2262,7 +2436,7 @@ function ClarificationBubble({ message, questions, originalContent, onSubmit, di
             </div>
             <div className="flex flex-wrap gap-1.5">
               {Object.entries(selections).filter(([_, v]) => v).map(([q, a]) => (
-                <span key={q} className="inline-flex items-center gap-1 px-2 py-1 bg-white rounded-lg text-[11px] text-gray-700 border border-green-200">
+                <span key={q} className="inline-flex items-center gap-1 px-2 py-1 bg-card rounded-lg text-[11px] text-foreground border border-green-200">
                   <CheckCircle className="w-2.5 h-2.5 text-green-500" />
                   {a}
                 </span>
@@ -2280,17 +2454,17 @@ function ClarificationBubble({ message, questions, originalContent, onSubmit, di
         <HelpCircle className="h-4 w-4 text-amber-500" />
       </div>
       <div className="flex flex-col gap-1.5 max-w-[85%]">
-        <div className="flex items-center gap-1.5 text-xs font-semibold text-gray-500 ml-1">
+        <div className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground ml-1">
           <Sparkles className="h-3 w-3 text-amber-500" /> 需求确认
         </div>
-        <div className="bg-white border border-gray-200 rounded-2xl rounded-tl-none px-4 py-3.5 shadow-sm">
-          <p className="text-sm text-gray-700 mb-3 leading-relaxed">{message}</p>
+        <div className="bg-card border border-border rounded-2xl rounded-tl-none px-4 py-3.5 shadow-sm">
+          <p className="text-sm text-foreground mb-3 leading-relaxed">{message}</p>
           <div className="space-y-3">
             {questions.map((q, qi) => {
               const isAnswered = !!selections[q.question];
               return (
                 <div key={qi}>
-                  <p className="text-xs font-medium text-gray-800 mb-1.5">{q.question}</p>
+                  <p className="text-xs font-medium text-foreground mb-1.5">{q.question}</p>
                   <div className="flex flex-wrap gap-1.5">
                     {q.options.map((opt, oi) => {
                       const isSelected = selections[q.question] === opt;
@@ -2302,10 +2476,10 @@ function ClarificationBubble({ message, questions, originalContent, onSubmit, di
                           disabled={isLocked}
                           className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-all ${
                             isSelected
-                              ? 'bg-blue-600 text-white border-blue-600 shadow-sm scale-[1.02]'
+                              ? 'bg-primary text-white border-primary shadow-sm scale-[1.02]'
                               : isLocked
-                              ? 'bg-gray-50 text-gray-300 border-gray-100 cursor-not-allowed'
-                              : 'bg-white text-gray-600 border-gray-200 hover:border-blue-300 hover:text-blue-600 hover:bg-blue-50 cursor-pointer active:scale-95'
+                              ? 'bg-muted text-muted-foreground/40 border-border cursor-not-allowed'
+                              : 'bg-card text-muted-foreground border-border hover:border-primary/40 hover:text-primary hover:bg-primary/10 cursor-pointer active:scale-95'
                           }`}
                         >
                           {opt}
@@ -2329,7 +2503,7 @@ function ClarificationBubble({ message, questions, originalContent, onSubmit, di
                 <button
                   onClick={handleSubmit}
                   disabled={disabled}
-                  className="mt-3 w-full flex items-center justify-center gap-1.5 px-4 py-2.5 bg-blue-600 text-white text-sm font-medium rounded-xl hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-[0.98] shadow-sm"
+                  className="mt-3 w-full flex items-center justify-center gap-1.5 px-4 py-2.5 bg-primary text-white text-sm font-medium rounded-xl hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-[0.98] shadow-sm"
                 >
                   <span>确认并继续</span>
                   <ChevronRight className="w-4 h-4" />
@@ -2338,7 +2512,7 @@ function ClarificationBubble({ message, questions, originalContent, onSubmit, di
             )}
           </AnimatePresence>
           {!allAnswered && (
-            <p className="text-[10px] text-gray-400 mt-2 text-center">
+            <p className="text-[10px] text-muted-foreground/50 mt-2 text-center">
               请逐一选择 · 已完成 {answeredCount}/{questions.length}
             </p>
           )}

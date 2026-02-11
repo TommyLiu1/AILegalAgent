@@ -55,10 +55,10 @@ export function NotificationCenter({ onClose }: NotificationCenterProps) {
   };
 
   const typeConfig = {
-    urgent: { bg: 'bg-[#FFF1F0]', border: 'border-[#FF3B30]', text: 'text-[#FF3B30]', icon: AlertCircle },
-    warning: { bg: 'bg-[#FFF8ED]', border: 'border-[#FF9500]', text: 'text-[#FF9500]', icon: AlertCircle },
-    info: { bg: 'bg-[#E5F3FF]', border: 'border-[#007AFF]', text: 'text-[#007AFF]', icon: Bell },
-    success: { bg: 'bg-[#E8F8EE]', border: 'border-[#34C759]', text: 'text-[#34C759]', icon: Check },
+    urgent: { bg: 'bg-destructive/10', border: 'border-destructive', text: 'text-destructive', icon: AlertCircle },
+    warning: { bg: 'bg-warning-light', border: 'border-warning', text: 'text-warning', icon: AlertCircle },
+    info: { bg: 'bg-primary/10', border: 'border-primary', text: 'text-primary', icon: Bell },
+    success: { bg: 'bg-success/10', border: 'border-success', text: 'text-success', icon: Check },
   };
 
   const getIcon = (type: string) => {
@@ -84,25 +84,25 @@ export function NotificationCenter({ onClose }: NotificationCenterProps) {
           animate={{ opacity: 1, x: 0 }}
           exit={{ opacity: 0, x: 320 }}
           onClick={(e) => e.stopPropagation()}
-          className="absolute right-0 top-0 bottom-0 w-96 bg-white shadow-2xl flex flex-col"
+          className="absolute right-0 top-0 bottom-0 w-96 bg-card shadow-2xl flex flex-col"
         >
           {/* Header */}
-          <div className="p-6 border-b border-[#E5E5EA]">
+          <div className="p-6 border-b border-border">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
-                <Bell className="w-5 h-5 text-[#8E8E93]" />
-                <h2 className="font-semibold text-[#1C1C1E]">通知中心</h2>
+                <Bell className="w-5 h-5 text-muted-foreground" />
+                <h2 className="font-semibold text-foreground">通知中心</h2>
               </div>
               <button
                 onClick={onClose}
-                className="p-1.5 hover:bg-[#F2F2F7] rounded-full transition-colors"
+                className="p-1.5 hover:bg-muted rounded-full transition-colors"
               >
-                <X className="w-5 h-5 text-[#8E8E93]" />
+                <X className="w-5 h-5 text-muted-foreground" />
               </button>
             </div>
             <button
               onClick={handleMarkAllAsRead}
-              className="text-sm text-[#007AFF] hover:text-[#0051D5] font-medium active:opacity-70 transition-opacity"
+              className="text-sm text-primary hover:text-primary/90 font-medium active:opacity-70 transition-opacity"
             >
               全部标记为已读
             </button>
@@ -112,10 +112,10 @@ export function NotificationCenter({ onClose }: NotificationCenterProps) {
           <div className="flex-1 overflow-y-auto p-4">
             {loading ? (
               <div className="flex items-center justify-center h-full">
-                <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
+                <Loader2 className="w-6 h-6 animate-spin text-muted-foreground/50" />
               </div>
             ) : notifications.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-full text-gray-400">
+              <div className="flex flex-col items-center justify-center h-full text-muted-foreground/50">
                 <Bell className="w-12 h-12 mb-2 opacity-20" />
                 <p>暂无通知</p>
               </div>
@@ -142,15 +142,15 @@ export function NotificationCenter({ onClose }: NotificationCenterProps) {
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center justify-between mb-1">
-                            <h4 className="font-medium text-sm text-[#1C1C1E]">{notification.title}</h4>
+                            <h4 className="font-medium text-sm text-foreground">{notification.title}</h4>
                             {!notification.is_read && (
-                              <div className="w-2 h-2 bg-[#007AFF] rounded-full flex-shrink-0"></div>
+                              <div className="w-2 h-2 bg-primary rounded-full flex-shrink-0"></div>
                             )}
                           </div>
-                          <p className="text-sm text-[#3C3C43] leading-relaxed mb-2">
+                          <p className="text-sm text-foreground/80 leading-relaxed mb-2">
                             {notification.message}
                           </p>
-                          <p className="text-xs text-[#8E8E93]">
+                          <p className="text-xs text-muted-foreground">
                             {formatDistanceToNow(new Date(notification.created_at), { addSuffix: true, locale: zhCN })}
                           </p>
                         </div>
@@ -163,8 +163,8 @@ export function NotificationCenter({ onClose }: NotificationCenterProps) {
           </div>
 
           {/* Footer */}
-          <div className="p-4 border-t border-[#E5E5EA]">
-            <button className="w-full py-2.5 text-sm text-[#007AFF] hover:bg-[#F2F2F7] rounded-xl font-medium transition-colors active:scale-98">
+          <div className="p-4 border-t border-border">
+            <button className="w-full py-2.5 text-sm text-primary hover:bg-muted rounded-xl font-medium transition-colors active:scale-98">
               查看全部通知
             </button>
           </div>

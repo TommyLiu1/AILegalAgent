@@ -46,22 +46,35 @@ class LitigationStrategistAgent(BaseLegalAgent):
     
     async def process(self, task: Dict[str, Any]) -> AgentResponse:
         """处理诉讼策略任务"""
-        case_info = task.get("case_info", {})
-        evidence_list = task.get("evidence", [])
-        opponent_info = task.get("opponent", {})
+        description = task.get("description", "")
+        context = task.get("context", {})
+        llm_config = context.get("llm_config") or task.get("llm_config")
         
-        # 构建提示
-        prompt = f"""
-请为以下案件制定诉讼策略：
+        # 兼容：如果有结构化字段则使用，否则用 description
+        case_info = task.get("case_info") or context.get("case_info") or ""
+        evidence_list = task.get("evidence") or context.get("evidence") or []
+        opponent_info = task.get("opponent") or context.get("opponent") or ""
+        
+        # 注入前序 Agent 的结果
+        dep_results = task.get("dependent_results", {})
+        dep_context = ""
+        if dep_results:
+            dep_context = "\n\n--- 前序分析结果 ---\n"
+            for dep_id, dep_res in dep_results.items():
+                if hasattr(dep_res, 'content'):
+                    dep_context += f"\n{dep_res.agent_name}:\n{dep_res.content[:1500]}\n"
+                elif isinstance(dep_res, dict):
+                    dep_context += f"\n{dep_res.get('agent_name', dep_id)}:\n{str(dep_res.get('content', ''))[:1500]}\n"
+        
+        prompt = f"""请为以下案件制定诉讼策略：
 
-案件基本信息：
-{case_info}
+案件描述：
+{description}
 
-现有证据：
-{evidence_list}
-
-对方当事人信息：
-{opponent_info}
+{f'案件详情：{case_info}' if case_info else ''}
+{f'现有证据：{evidence_list}' if evidence_list else ''}
+{f'对方信息：{opponent_info}' if opponent_info else ''}
+{dep_context}
 
 请提供以下分析：
 1. **案件评估**：核心争议焦点、胜诉概率预估。
@@ -71,14 +84,19 @@ class LitigationStrategistAgent(BaseLegalAgent):
 5. **行动计划**：下一阶段的具体行动步骤。
 """
         
-        # 调用Agent
-        response = await self.chat(prompt)
-        
-        return AgentResponse(
-            agent_name=self.name,
-            content=response,
-            reasoning="基于案件分析方法论和诉讼实务经验",
-            actions=[
-                {"type": "strategy_report", "description": "生成诉讼策略分析报告"}
-            ]
-        )
+        try:
+            response = await self.chat(prompt, llm_config=llm_config)
+            return AgentResponse(
+                agent_name=self.name,
+                content=response,
+                reasoning="基于案件分析方法论和诉讼实务经验",
+                actions=[
+                    {"type": "strategy_report", "description": "生成诉讼策略分析报告"}
+                ]
+            )
+        except Exception as e:
+            return AgentResponse(
+                agent_name=self.name,
+                content=f"诉讼策略分析失败: {str(e)[:200]}",
+                metadata={"error": True}
+            )

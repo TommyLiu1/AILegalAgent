@@ -482,7 +482,7 @@ class CaseService:
                 Case.deadline.isnot(None),
                 Case.deadline <= deadline_threshold,
                 Case.status != CaseStatus.COMPLETED,
-                Case.status != CaseStatus.ARCHIVED
+                Case.status != CaseStatus.CLOSED
             )
             .order_by(Case.deadline)
             .limit(5)
@@ -490,7 +490,9 @@ class CaseService:
         deadline_cases = (await self.db.execute(deadline_query)).scalars().all()
         
         for case in deadline_cases:
-            days_left = (case.deadline - datetime.now().date()).days if isinstance(case.deadline, date) else (case.deadline.date() - datetime.now().date()).days
+            # 统一转换为 date 再计算天数差
+            dl = case.deadline.date() if isinstance(case.deadline, datetime) else case.deadline
+            days_left = (dl - datetime.now().date()).days
             alerts.append({
                 "id": f"deadline-{case.id}",
                 "type": "urgent" if days_left <= 3 else "warning",

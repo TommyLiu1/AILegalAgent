@@ -44,20 +44,28 @@ class IPSpecialistAgent(BaseLegalAgent):
     
     async def process(self, task: Dict[str, Any]) -> AgentResponse:
         """处理知识产权任务"""
-        query_type = task.get("type", "consultation") # consultation, infringement_check, registration
-        details = task.get("details", "")
+        description = task.get("description", "")
         context = task.get("context", {})
+        llm_config = context.get("llm_config") or task.get("llm_config")
         
-        prompt = ""
+        # 兼容：如果有结构化字段则使用
+        query_type = task.get("type") or context.get("type") or "consultation"
+        details = task.get("details") or context.get("details") or description
         
-        if query_type == "infringement_check":
-            prompt = f"""
-请进行知识产权侵权初步分析：
+        # 判断是否为侵权分析场景
+        is_infringement = (
+            query_type == "infringement_check"
+            or "侵权" in description
+            or "抄袭" in description
+        )
+        
+        if is_infringement:
+            prompt = f"""请进行知识产权侵权初步分析：
 
 疑似侵权行为描述：
 {details}
 
-权利权利基础（如专利号、商标注册号、作品登记等）：
+权利基础（如专利号、商标注册号、作品登记等）：
 {context.get('rights_basis', '未提供')}
 
 对比文件/对象：
@@ -70,26 +78,30 @@ class IPSpecialistAgent(BaseLegalAgent):
 4. 维权建议。
 """
         else:
-            prompt = f"""
-请回答以下知识产权咨询：
+            prompt = f"""请回答以下知识产权咨询：
 
 问题详情：
 {details}
 
-背景信息：
-{context}
-
-请提供专业解答和建议。
+请提供专业解答和建议，包括：
+1. 相关法律依据
+2. 具体操作建议
+3. 需要注意的风险点
 """
         
-        # 调用Agent
-        response = await self.chat(prompt)
-        
-        return AgentResponse(
-            agent_name=self.name,
-            content=response,
-            reasoning="基于知识产权法律法规及审查标准",
-            actions=[
-                {"type": "ip_analysis", "description": "提供IP专业分析意见"}
-            ]
-        )
+        try:
+            response = await self.chat(prompt, llm_config=llm_config)
+            return AgentResponse(
+                agent_name=self.name,
+                content=response,
+                reasoning="基于知识产权法律法规及审查标准",
+                actions=[
+                    {"type": "ip_analysis", "description": "提供IP专业分析意见"}
+                ]
+            )
+        except Exception as e:
+            return AgentResponse(
+                agent_name=self.name,
+                content=f"知识产权分析失败: {str(e)[:200]}",
+                metadata={"error": True}
+            )

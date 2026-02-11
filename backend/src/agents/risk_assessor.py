@@ -83,7 +83,8 @@ class RiskAssessmentAgent(BaseLegalAgent):
     async def process(self, task: Dict[str, Any]) -> AgentResponse:
         """处理风险评估任务 (支持 A2UI 动态输出)"""
         description = task.get("description", "")
-        context = task.get("context", {})
+        context = task.get("context") or {}
+        llm_config = context.get("llm_config") or task.get("llm_config")
         dependent_results = task.get("dependent_results", {})
         
         # 整合前置智能体的结果
@@ -135,33 +136,40 @@ JSON 格式示例：
 ```
 """
         
-        # 调用Agent
-        response_text = await self.chat(prompt)
-        
-        # 提取 A2UI JSON
-        import json
-        import re
-        a2ui_data = {}
-        json_match = re.search(r'```json\s*(\{.*?\})\s*```', response_text, re.DOTALL)
-        if not json_match:
-            json_match = re.search(r'(\{.*"a2ui".*\})', response_text, re.DOTALL)
+        try:
+            # 调用Agent
+            response_text = await self.chat(prompt, llm_config=llm_config)
             
-        if json_match:
-            try:
-                raw_json = json.loads(json_match.group(1))
-                a2ui_data = raw_json.get("a2ui", {})
-            except:
-                pass
-        
-        return AgentResponse(
-            agent_name=self.name,
-            content=response_text,
-            reasoning="基于法律风险评估模型和 A2UI 动态渲染协议",
-            metadata={"a2ui": a2ui_data},
-            actions=[
-                {"type": "risk_assessment", "description": "风险评估完成"}
-            ]
-        )
+            # 提取 A2UI JSON
+            import json
+            import re
+            a2ui_data = {}
+            json_match = re.search(r'```json\s*(\{.*?\})\s*```', response_text, re.DOTALL)
+            if not json_match:
+                json_match = re.search(r'(\{.*"a2ui".*\})', response_text, re.DOTALL)
+                
+            if json_match:
+                try:
+                    raw_json = json.loads(json_match.group(1))
+                    a2ui_data = raw_json.get("a2ui", {})
+                except:
+                    pass
+            
+            return AgentResponse(
+                agent_name=self.name,
+                content=response_text,
+                reasoning="基于法律风险评估模型和 A2UI 动态渲染协议",
+                metadata={"a2ui": a2ui_data},
+                actions=[
+                    {"type": "risk_assessment", "description": "风险评估完成"}
+                ]
+            )
+        except Exception as e:
+            return AgentResponse(
+                agent_name=self.name,
+                content=f"处理失败: {str(e)[:200]}",
+                metadata={"error": True}
+            )
     
     async def assess_transaction(self, transaction_info: Dict[str, Any]) -> Dict[str, Any]:
         """评估交易风险"""

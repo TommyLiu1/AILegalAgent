@@ -40,15 +40,15 @@ export const CardSkeleton = memo(function CardSkeleton({ type }: { type?: string
 /** 律师卡片骨架屏 */
 const LawyerCardSkeleton = memo(function LawyerCardSkeleton() {
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 animate-pulse">
+    <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-100 dark:border-zinc-800 shadow-sm p-4 animate-pulse">
       <div className="flex items-start gap-3">
         {/* 头像 */}
-        <div className="w-12 h-12 rounded-full bg-gray-200 flex-shrink-0" />
+        <div className="w-12 h-12 rounded-full bg-zinc-200 dark:bg-zinc-700 flex-shrink-0" />
         <div className="flex-1 space-y-2">
           {/* 姓名 */}
-          <div className="h-4 bg-gray-200 rounded w-24" />
+          <div className="h-4 bg-zinc-200 dark:bg-zinc-700 rounded w-24" />
           {/* 事务所 */}
-          <div className="h-3 bg-gray-100 rounded w-36" />
+          <div className="h-3 bg-zinc-100 dark:bg-zinc-800 rounded w-36" />
           {/* 标签 */}
           <div className="flex gap-1.5">
             <div className="h-5 bg-blue-50 rounded-full w-14" />
@@ -60,8 +60,8 @@ const LawyerCardSkeleton = memo(function LawyerCardSkeleton() {
         <div className="h-6 w-12 bg-amber-50 rounded-full" />
       </div>
       {/* 底部按钮 */}
-      <div className="mt-3 pt-3 border-t border-gray-100 flex items-center justify-between">
-        <div className="h-3 bg-gray-100 rounded w-20" />
+      <div className="mt-3 pt-3 border-t border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
+        <div className="h-3 bg-zinc-100 dark:bg-zinc-800 rounded w-20" />
         <div className="h-8 bg-blue-100 rounded-lg w-20" />
       </div>
     </div>
@@ -71,24 +71,24 @@ const LawyerCardSkeleton = memo(function LawyerCardSkeleton() {
 /** 合同对比骨架屏 */
 const ContractCompareSkeleton = memo(function ContractCompareSkeleton() {
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden animate-pulse">
-      <div className="px-4 py-3 border-b border-gray-100 bg-gradient-to-r from-blue-50/30 to-purple-50/30">
-        <div className="h-4 bg-gray-200 rounded w-32" />
-        <div className="h-3 bg-gray-100 rounded w-48 mt-1" />
+    <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-100 dark:border-zinc-800 shadow-sm overflow-hidden animate-pulse">
+      <div className="px-4 py-3 border-b border-zinc-100 dark:border-zinc-800 bg-gradient-to-r from-blue-50/30 to-purple-50/30 dark:from-blue-950/20 dark:to-purple-950/20">
+        <div className="h-4 bg-zinc-200 dark:bg-zinc-700 rounded w-32" />
+        <div className="h-3 bg-zinc-100 dark:bg-zinc-800 rounded w-48 mt-1" />
       </div>
-      <div className="px-4 py-3 bg-gray-50/50 border-b border-gray-100 flex items-center gap-4">
-        <div className="h-3 bg-gray-200 rounded w-24" />
+      <div className="px-4 py-3 bg-zinc-50/50 dark:bg-zinc-900/50 border-b border-zinc-100 dark:border-zinc-800 flex items-center gap-4">
+        <div className="h-3 bg-zinc-200 dark:bg-zinc-700 rounded w-24" />
         <div className="h-5 bg-green-50 rounded-full w-16" />
       </div>
-      <div className="px-4 py-2 grid grid-cols-2 gap-4 border-b border-gray-100">
-        <div className="h-3 bg-gray-100 rounded w-16" />
-        <div className="h-3 bg-gray-100 rounded w-16" />
+      <div className="px-4 py-2 grid grid-cols-2 gap-4 border-b border-zinc-100 dark:border-zinc-800">
+        <div className="h-3 bg-zinc-100 dark:bg-zinc-800 rounded w-16" />
+        <div className="h-3 bg-zinc-100 dark:bg-zinc-800 rounded w-16" />
       </div>
       {[1, 2, 3].map((i) => (
-        <div key={i} className="px-4 py-3 border-b border-gray-50 flex items-center gap-2">
-          <div className="w-3.5 h-3.5 rounded bg-gray-200" />
-          <div className="h-3 bg-gray-200 rounded flex-1 max-w-[60%]" />
-          <div className="h-5 bg-gray-100 rounded-full w-12 ml-auto" />
+        <div key={i} className="px-4 py-3 border-b border-zinc-50 dark:border-zinc-800 flex items-center gap-2">
+          <div className="w-3.5 h-3.5 rounded bg-zinc-200 dark:bg-zinc-700" />
+          <div className="h-3 bg-zinc-200 dark:bg-zinc-700 rounded flex-1 max-w-[60%]" />
+          <div className="h-5 bg-zinc-100 dark:bg-zinc-800 rounded-full w-12 ml-auto" />
         </div>
       ))}
     </div>
@@ -98,23 +98,23 @@ const ContractCompareSkeleton = memo(function ContractCompareSkeleton() {
 /** 费用估算骨架屏 */
 const FeeEstimateSkeleton = memo(function FeeEstimateSkeleton() {
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden animate-pulse">
-      <div className="px-4 py-3 border-b border-gray-100 flex items-center gap-2">
+    <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-100 dark:border-zinc-800 shadow-sm overflow-hidden animate-pulse">
+      <div className="px-4 py-3 border-b border-zinc-100 dark:border-zinc-800 flex items-center gap-2">
         <div className="w-8 h-8 rounded-lg bg-orange-50" />
         <div>
-          <div className="h-4 bg-gray-200 rounded w-24" />
-          <div className="h-3 bg-gray-100 rounded w-36 mt-1" />
+          <div className="h-4 bg-zinc-200 dark:bg-zinc-700 rounded w-24" />
+          <div className="h-3 bg-zinc-100 dark:bg-zinc-800 rounded w-36 mt-1" />
         </div>
       </div>
       <div className="px-4 py-3 space-y-3">
         {[1, 2, 3].map((i) => (
           <div key={i} className="flex items-center justify-between">
-            <div className="h-3 bg-gray-200 rounded w-28" />
-            <div className="h-3 bg-gray-200 rounded w-16" />
+            <div className="h-3 bg-zinc-200 dark:bg-zinc-700 rounded w-28" />
+            <div className="h-3 bg-zinc-200 dark:bg-zinc-700 rounded w-16" />
           </div>
         ))}
-        <div className="pt-3 border-t border-gray-200 flex items-center justify-between">
-          <div className="h-3 bg-gray-200 rounded w-12" />
+        <div className="pt-3 border-t border-zinc-200 dark:border-zinc-700 flex items-center justify-between">
+          <div className="h-3 bg-zinc-200 dark:bg-zinc-700 rounded w-12" />
           <div className="h-5 bg-orange-100 rounded w-20" />
         </div>
       </div>
@@ -125,15 +125,15 @@ const FeeEstimateSkeleton = memo(function FeeEstimateSkeleton() {
 /** 推荐卡片骨架屏 */
 const RecommendationSkeleton = memo(function RecommendationSkeleton() {
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 animate-pulse">
+    <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-100 dark:border-zinc-800 shadow-sm p-4 animate-pulse">
       <div className="flex items-start gap-3">
-        <div className="w-16 h-16 rounded-xl bg-gray-200 flex-shrink-0" />
+        <div className="w-16 h-16 rounded-xl bg-zinc-200 dark:bg-zinc-700 flex-shrink-0" />
         <div className="flex-1 space-y-2">
-          <div className="h-4 bg-gray-200 rounded w-32" />
-          <div className="h-3 bg-gray-100 rounded w-48" />
+          <div className="h-4 bg-zinc-200 dark:bg-zinc-700 rounded w-32" />
+          <div className="h-3 bg-zinc-100 dark:bg-zinc-800 rounded w-48" />
           <div className="flex gap-1.5">
-            <div className="h-5 bg-gray-100 rounded-full w-14" />
-            <div className="h-5 bg-gray-100 rounded-full w-18" />
+            <div className="h-5 bg-zinc-100 dark:bg-zinc-800 rounded-full w-14" />
+            <div className="h-5 bg-zinc-100 dark:bg-zinc-800 rounded-full w-18" />
           </div>
         </div>
       </div>
@@ -144,14 +144,14 @@ const RecommendationSkeleton = memo(function RecommendationSkeleton() {
 /** 通用卡片骨架屏 */
 const GenericCardSkeleton = memo(function GenericCardSkeleton() {
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 animate-pulse">
+    <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-100 dark:border-zinc-800 shadow-sm p-4 animate-pulse">
       <div className="space-y-3">
-        <div className="h-4 bg-gray-200 rounded w-3/4" />
-        <div className="h-3 bg-gray-100 rounded w-full" />
-        <div className="h-3 bg-gray-100 rounded w-5/6" />
+        <div className="h-4 bg-zinc-200 dark:bg-zinc-700 rounded w-3/4" />
+        <div className="h-3 bg-zinc-100 dark:bg-zinc-800 rounded w-full" />
+        <div className="h-3 bg-zinc-100 dark:bg-zinc-800 rounded w-5/6" />
         <div className="flex gap-2 mt-3">
           <div className="h-8 bg-blue-50 rounded-lg flex-1" />
-          <div className="h-8 bg-gray-100 rounded-lg w-20" />
+          <div className="h-8 bg-zinc-100 dark:bg-zinc-800 rounded-lg w-20" />
         </div>
       </div>
     </div>
@@ -249,7 +249,7 @@ export const StreamingA2UIRenderer = memo(function StreamingA2UIRenderer({
           className="flex items-center gap-1.5 mb-2"
         >
           <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
-          <span className="text-[10px] text-gray-400 font-medium">{agent}</span>
+          <span className="text-[10px] text-zinc-400 dark:text-zinc-500 font-medium">{agent}</span>
           {isStreaming && (
             <span className="text-[10px] text-blue-500 animate-pulse">正在生成...</span>
           )}

@@ -43,17 +43,35 @@ class ContractStewardAgent(BaseLegalAgent):
     
     async def process(self, task: Dict[str, Any]) -> AgentResponse:
         """处理合同管理任务"""
-        action = task.get("action", "archive") # archive, check_status, analyze_risk
+        description = task.get("description", "")
         context = task.get("context", {})
+        llm_config = context.get("llm_config") or task.get("llm_config")
+        
+        action = task.get("action") or context.get("action") or "general"
         contract_text = context.get("contract_text", "")
         contract_id = context.get("contract_id", "unknown")
         
-        if action == "archive":
-            return await self._archive_contract(contract_text, contract_id)
-        elif action == "check_status":
-            return await self._check_contract_status(context.get("contract_metadata", {}))
-        else:
-            return await self._general_management(task.get("description", ""))
+        # 从描述中推断动作类型
+        if action == "general":
+            desc_lower = description.lower()
+            if "归档" in desc_lower:
+                action = "archive"
+            elif "状态" in desc_lower or "到期" in desc_lower or "提醒" in desc_lower:
+                action = "check_status"
+        
+        try:
+            if action == "archive" and contract_text:
+                return await self._archive_contract(contract_text, contract_id)
+            elif action == "check_status":
+                return await self._check_contract_status(context.get("contract_metadata", {}))
+            else:
+                return await self._general_management(description, llm_config=llm_config)
+        except Exception as e:
+            return AgentResponse(
+                agent_name=self.name,
+                content=f"合同管理任务处理失败: {str(e)[:200]}",
+                metadata={"error": True}
+            )
 
     async def _archive_contract(self, text: str, cid: str) -> AgentResponse:
         """归档并提取要素"""
@@ -121,7 +139,7 @@ class ContractStewardAgent(BaseLegalAgent):
             ]
         )
 
-    async def _general_management(self, query: str) -> AgentResponse:
+    async def _general_management(self, query: str, llm_config=None) -> AgentResponse:
         """通用管理问答"""
-        response = await self.chat(query)
+        response = await self.chat(query, llm_config=llm_config)
         return AgentResponse(agent_name=self.name, content=response)

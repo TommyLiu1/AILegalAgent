@@ -1,21 +1,23 @@
 /**
- * ClarificationBubble — 引导式问答气泡组件
+ * ClarificationBubble — 引导式问答气泡组件 (v2)
  * 
- * 核心功能：
- * 1. 选择后立即锁定（不可修改、不可多选）
- * 2. 提交后不再输出选择内容到对话流（直接显示"已确认"状态）
- * 3. 提交后的选择以紧凑标签形式展示，不重复出现
+ * 核心改进：
+ * 1. 选择后可点击取消重选（不再单选锁定）
+ * 2. 至少选择 1 项即可显示确认按钮（不需要全部选完）
+ * 3. 确认按钮始终可见且醒目，提示未完成的选项
+ * 4. 允许用户在底部输入补充说明
+ * 5. 提交后的选择以紧凑标签形式展示
  */
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { CheckCircle, Loader2, HelpCircle, Sparkles, ChevronRight } from 'lucide-react';
+import { CheckCircle, Loader2, HelpCircle, Sparkles, ChevronRight, RotateCcw, MessageSquarePlus } from 'lucide-react';
 
 interface ClarificationBubbleProps {
   message: string;
   questions: { question: string; options: string[] }[];
   originalContent: string;
-  onSubmit?: (originalContent: string, selections: Record<string, string>) => void;
+  onSubmit?: (originalContent: string, selections: Record<string, string>, supplement?: string) => void;
   disabled: boolean;
 }
 
@@ -28,11 +30,22 @@ export function ClarificationBubble({
 }: ClarificationBubbleProps) {
   const [selections, setSelections] = useState<Record<string, string>>({});
   const [submitted, setSubmitted] = useState(false);
+  const [supplement, setSupplement] = useState('');
+  const [showSupplement, setShowSupplement] = useState(false);
+  const supplementRef = useRef<HTMLTextAreaElement>(null);
 
   const handleSelect = (question: string, option: string) => {
-    // 已提交或已有选择时不可更改（单选锁定）
-    if (submitted || selections[question]) return;
-    setSelections(prev => ({ ...prev, [question]: option }));
+    if (submitted) return;
+    setSelections(prev => {
+      // 点击已选中的选项 → 取消选择
+      if (prev[question] === option) {
+        const next = { ...prev };
+        delete next[question];
+        return next;
+      }
+      // 选择新选项
+      return { ...prev, [question]: option };
+    });
   };
 
   const handleSubmit = () => {
@@ -40,12 +53,12 @@ export function ClarificationBubble({
     const valid = Object.fromEntries(Object.entries(selections).filter(([_, v]) => v));
     if (Object.keys(valid).length === 0) return;
     setSubmitted(true);
-    // 直接发送到后端，不在对话流中重复输出选择文字
-    onSubmit?.(originalContent, valid);
+    onSubmit?.(originalContent, valid, supplement.trim() || undefined);
   };
 
   const answeredCount = Object.values(selections).filter(v => v).length;
   const allAnswered = answeredCount === questions.length;
+  const hasAnyAnswer = answeredCount > 0;
 
   // 提交后的紧凑视图
   if (submitted) {
@@ -69,6 +82,11 @@ export function ClarificationBubble({
                 </span>
               ))}
             </div>
+            {supplement && (
+              <p className="mt-2 text-[11px] text-green-700 bg-white/60 px-2 py-1 rounded-lg border border-green-100">
+                补充：{supplement}
+              </p>
+            )}
           </div>
         </div>
       </motion.div>
@@ -91,25 +109,29 @@ export function ClarificationBubble({
               const isAnswered = !!selections[q.question];
               return (
                 <div key={qi}>
-                  <p className="text-xs font-medium text-gray-800 mb-1.5">{q.question}</p>
+                  <div className="flex items-center gap-1.5 mb-1.5">
+                    <p className="text-xs font-medium text-gray-800">{q.question}</p>
+                    {isAnswered && (
+                      <CheckCircle className="w-3 h-3 text-green-500 flex-shrink-0" />
+                    )}
+                  </div>
                   <div className="flex flex-wrap gap-1.5">
                     {q.options.map((opt, oi) => {
                       const isSelected = selections[q.question] === opt;
-                      const isLocked = isAnswered && !isSelected;
                       return (
                         <button
                           key={oi}
                           onClick={() => handleSelect(q.question, opt)}
-                          disabled={isLocked}
-                          className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-all ${
+                          className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-all cursor-pointer active:scale-95 ${
                             isSelected
                               ? 'bg-blue-600 text-white border-blue-600 shadow-sm scale-[1.02]'
-                              : isLocked
-                              ? 'bg-gray-50 text-gray-300 border-gray-100 cursor-not-allowed'
-                              : 'bg-white text-gray-600 border-gray-200 hover:border-blue-300 hover:text-blue-600 hover:bg-blue-50 cursor-pointer active:scale-95'
+                              : 'bg-white text-gray-600 border-gray-200 hover:border-blue-300 hover:text-blue-600 hover:bg-blue-50'
                           }`}
                         >
                           {opt}
+                          {isSelected && (
+                            <span className="ml-1 text-[10px] opacity-70">✓</span>
+                          )}
                         </button>
                       );
                     })}
@@ -118,29 +140,68 @@ export function ClarificationBubble({
               );
             })}
           </div>
-          {/* 确认按钮 — 仅全部选择后显示 */}
-          <AnimatePresence>
-            {allAnswered && (
-              <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: 'auto' }}
-                exit={{ opacity: 0, height: 0 }}
-                className="overflow-hidden"
+
+          {/* 补充说明输入区 */}
+          <div className="mt-3 pt-3 border-t border-gray-100">
+            {!showSupplement ? (
+              <button
+                onClick={() => {
+                  setShowSupplement(true);
+                  setTimeout(() => supplementRef.current?.focus(), 100);
+                }}
+                className="inline-flex items-center gap-1 text-[11px] text-gray-400 hover:text-blue-500 transition-colors"
               >
-                <button
-                  onClick={handleSubmit}
-                  disabled={disabled}
-                  className="mt-3 w-full flex items-center justify-center gap-1.5 px-4 py-2.5 bg-blue-600 text-white text-sm font-medium rounded-xl hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-[0.98] shadow-sm"
+                <MessageSquarePlus className="w-3 h-3" />
+                添加补充说明（可选）
+              </button>
+            ) : (
+              <AnimatePresence>
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
                 >
-                  <span>确认并继续</span>
-                  <ChevronRight className="w-4 h-4" />
-                </button>
-              </motion.div>
+                  <textarea
+                    ref={supplementRef}
+                    value={supplement}
+                    onChange={(e) => setSupplement(e.target.value)}
+                    placeholder="补充需求说明，如预算范围、时间要求、特殊情况等..."
+                    rows={2}
+                    className="w-full px-3 py-2 text-xs text-gray-700 bg-gray-50 border border-gray-200 rounded-lg resize-none focus:outline-none focus:ring-1 focus:ring-blue-400 focus:border-blue-400 placeholder:text-gray-400"
+                  />
+                </motion.div>
+              </AnimatePresence>
             )}
-          </AnimatePresence>
-          {!allAnswered && (
-            <p className="text-[10px] text-gray-400 mt-2 text-center">
-              请逐一选择 · 已完成 {answeredCount}/{questions.length}
+          </div>
+
+          {/* 确认按钮 — 至少选择 1 项即显示 */}
+          <div className="mt-3">
+            <button
+              onClick={handleSubmit}
+              disabled={disabled || !hasAnyAnswer}
+              className={`w-full flex items-center justify-center gap-1.5 px-4 py-2.5 text-sm font-medium rounded-xl transition-all active:scale-[0.98] shadow-sm ${
+                hasAnyAnswer
+                  ? 'bg-blue-600 text-white hover:bg-blue-700'
+                  : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+              } disabled:opacity-50 disabled:cursor-not-allowed`}
+            >
+              {hasAnyAnswer ? (
+                <>
+                  <span>确认并继续</span>
+                  {!allAnswered && (
+                    <span className="text-[10px] opacity-80 ml-1">({answeredCount}/{questions.length})</span>
+                  )}
+                  <ChevronRight className="w-4 h-4" />
+                </>
+              ) : (
+                <span>请先选择选项</span>
+              )}
+            </button>
+          </div>
+
+          {/* 进度提示 */}
+          {!allAnswered && hasAnyAnswer && (
+            <p className="text-[10px] text-blue-500 mt-1.5 text-center">
+              还有 {questions.length - answeredCount} 项未选择，也可以直接确认
             </p>
           )}
         </div>

@@ -72,7 +72,8 @@ class DueDiligenceAgent(BaseLegalAgent):
     async def process(self, task: Dict[str, Any]) -> AgentResponse:
         """处理尽职调查任务"""
         description = task.get("description", "")
-        context = task.get("context", {})
+        context = task.get("context") or {}
+        llm_config = context.get("llm_config") or task.get("llm_config")
         company_name = context.get("company_name", "")
         
         # 构建调查提示
@@ -92,21 +93,38 @@ class DueDiligenceAgent(BaseLegalAgent):
 请提供详细的调查发现和风险评估意见。
 """
         
-        # 调用Agent
-        response = await self.chat(prompt)
+        # Inject dependency results
+        dep_results = task.get("dependent_results", {})
+        if dep_results:
+            dep_context = "\n\n--- 前序分析结果 ---\n"
+            for dep_id, dep_res in dep_results.items():
+                if hasattr(dep_res, 'content'):
+                    dep_context += f"\n{dep_res.agent_name}:\n{dep_res.content[:1500]}\n"
+                elif isinstance(dep_res, dict):
+                    dep_context += f"\n{dep_res.get('agent_name', dep_id)}:\n{str(dep_res.get('content', ''))[:1500]}\n"
+            prompt += dep_context
         
-        return AgentResponse(
-            agent_name=self.name,
-            content=response,
-            reasoning="基于公开信息和数据库查询进行综合分析",
-            citations=[
-                {"source": "企业信用信息公示系统", "type": "database"},
-                {"source": "裁判文书网", "type": "database"},
-            ],
-            actions=[
-                {"type": "due_diligence_complete", "description": "尽职调查完成"}
-            ]
-        )
+        try:
+            response = await self.chat(prompt, llm_config=llm_config)
+            
+            return AgentResponse(
+                agent_name=self.name,
+                content=response,
+                reasoning="基于公开信息和数据库查询进行综合分析",
+                citations=[
+                    {"source": "企业信用信息公示系统", "type": "database"},
+                    {"source": "裁判文书网", "type": "database"},
+                ],
+                actions=[
+                    {"type": "due_diligence_complete", "description": "尽职调查完成"}
+                ]
+            )
+        except Exception as e:
+            return AgentResponse(
+                agent_name=self.name,
+                content=f"处理失败: {str(e)[:200]}",
+                metadata={"error": True}
+            )
     
     async def investigate_company(self, company_name: str) -> Dict[str, Any]:
         """调查指定企业"""

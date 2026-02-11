@@ -173,7 +173,7 @@ export function ChatCanvas() {
   // 移动端布局
   if (isMobile) {
     return (
-      <div className="h-full flex flex-col bg-white">
+      <div className="h-full flex flex-col bg-card">
         {/* Agent Flow Overlay */}
         {showAgentFlow && <AgentFlow />}
 
@@ -202,21 +202,21 @@ export function ChatCanvas() {
                 animate={{ y: 0 }}
                 exit={{ y: '100%' }}
                 transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-                className="fixed inset-x-0 bottom-0 z-50 bg-white rounded-t-3xl shadow-2xl max-h-[85vh] flex flex-col"
+                className="fixed inset-x-0 bottom-0 z-50 bg-card rounded-t-3xl shadow-2xl max-h-[85vh] flex flex-col"
               >
                 {/* Handle */}
-                <div className="flex items-center justify-center py-3 border-b border-[#E5E5EA]">
-                  <div className="w-10 h-1 bg-[#C7C7CC] rounded-full" />
+                <div className="flex items-center justify-center py-3 border-b border-border">
+                  <div className="w-10 h-1 bg-muted-foreground/40 rounded-full" />
                 </div>
 
                 {/* Header */}
-                <div className="px-4 py-3 border-b border-[#E5E5EA] flex items-center justify-between">
-                  <h3 className="font-semibold text-[#1C1C1E]">分析结果</h3>
+                <div className="px-4 py-3 border-b border-border flex items-center justify-between">
+                  <h3 className="font-semibold text-foreground">分析结果</h3>
                   <button
                     onClick={() => setShowContextPanel(false)}
-                    className="p-2 hover:bg-[#F2F2F7] rounded-lg transition-colors"
+                    className="p-2 hover:bg-muted rounded-lg transition-colors"
                   >
-                    <X className="w-5 h-5 text-[#8E8E93]" />
+                    <X className="w-5 h-5 text-muted-foreground" />
                   </button>
                 </div>
 
@@ -235,11 +235,11 @@ export function ChatCanvas() {
             initial={{ scale: 0 }}
             animate={{ scale: 1 }}
             onClick={() => setShowContextPanel(true)}
-            className="fixed bottom-20 right-4 w-14 h-14 bg-[#007AFF] rounded-full shadow-lg flex items-center justify-center text-white z-30 active:scale-95 transition-transform"
+            className="fixed bottom-20 right-4 w-14 h-14 bg-primary rounded-full shadow-lg flex items-center justify-center text-white z-30 active:scale-95 transition-transform"
           >
             <FileText className="w-6 h-6" />
             {contextContent.data?.detectedIssues && (
-              <span className="absolute -top-1 -right-1 w-6 h-6 bg-[#FF3B30] rounded-full text-xs font-bold flex items-center justify-center">
+              <span className="absolute -top-1 -right-1 w-6 h-6 bg-destructive rounded-full text-xs font-bold flex items-center justify-center">
                 {contextContent.data.detectedIssues}
               </span>
             )}
@@ -284,16 +284,16 @@ export function ChatCanvas() {
             },
           }}
           handleClasses={{
-            right: 'hover:bg-[#007AFF] transition-colors',
+            right: 'hover:bg-primary transition-colors',
           }}
-          className="border-r border-[#E5E5EA] flex flex-col bg-white"
+          className="border-r border-border flex flex-col bg-card"
         >
           <ChatPane messages={messages} isProcessing={isProcessing} />
           <MultiModalInput onSend={handleSendMessage} disabled={isProcessing} />
         </Resizable>
 
         {/* Right: Context Pane */}
-        <div className="flex-1 bg-[#F2F2F7] overflow-hidden">
+        <div className="flex-1 bg-muted overflow-hidden">
           <ContextPane content={contextContent} />
         </div>
       </div>

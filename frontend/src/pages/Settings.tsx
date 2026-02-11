@@ -9,12 +9,9 @@ import {
   Loader2, 
   Server, 
   Cpu, 
-  Key, 
-  Globe, 
   Zap, 
   Box,
   RefreshCw,
-  Shield,
   Activity,
   BarChart3
 } from 'lucide-react'
@@ -40,8 +37,8 @@ export default function Settings() {
     <div className="h-full flex flex-col overflow-hidden">
       <div className="container mx-auto py-6 space-y-8 flex-1 overflow-auto">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">系统设置</h1>
-          <p className="text-muted-foreground mt-2">
+          <h1 className="text-2xl font-bold tracking-tight">系统设置</h1>
+          <p className="text-sm text-muted-foreground mt-1">
             管理模型配置、第三方服务集成、监控看板和系统参数
           </p>
         </div>
@@ -933,7 +930,7 @@ function McpConfigDialog({ editingServer, onClose, onSave }: { editingServer: Mc
               type="checkbox" 
               checked={form.is_enabled}
               onChange={e => setForm({...form, is_enabled: e.target.checked})}
-              className="rounded border-gray-300"
+              className="rounded border-border"
             />
             <label className="text-sm">启用此服务</label>
           </div>

@@ -141,8 +141,14 @@ class McpClientService:
         return result
 
     async def close(self):
-        """Close all connections."""
-        await self._exit_stack.aclose()
+        """Close all connections safely."""
+        try:
+            await self._exit_stack.aclose()
+        except RuntimeError as e:
+            # anyio cancel scope 在不同 task 退出时会抛 RuntimeError
+            logger.debug(f"MCP exit stack cleanup warning (safe to ignore): {e}")
+        except Exception as e:
+            logger.warning(f"MCP close warning: {e}")
         self._sessions.clear()
         self._initialized = False
 

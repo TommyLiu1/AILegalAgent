@@ -274,7 +274,7 @@ class WorkingMemoryService(BaseMemoryService):
             "task_id": task_id,
             "started_at": datetime.now().isoformat(),
             "status": "active",
-            ...task_data
+            **task_data
         }
 
         session["active_tasks"].append(task)

@@ -71,7 +71,8 @@ class SentimentAnalysisAgent(BaseLegalAgent):
     async def process(self, task: Dict[str, Any]) -> AgentResponse:
         """处理舆情分析任务"""
         description = task.get("description", "")
-        context = task.get("context", {})
+        context = task.get("context") or {}
+        llm_config = context.get("llm_config") or task.get("llm_config")
         
         prompt = f"""
 请分析以下舆情信息：
@@ -87,16 +88,34 @@ class SentimentAnalysisAgent(BaseLegalAgent):
 请以结构化的JSON格式输出分析结果。
 """
         
-        response = await self.chat(prompt)
+        # Inject dependency results
+        dep_results = task.get("dependent_results", {})
+        if dep_results:
+            dep_context = "\n\n--- 前序分析结果 ---\n"
+            for dep_id, dep_res in dep_results.items():
+                if hasattr(dep_res, 'content'):
+                    dep_context += f"\n{dep_res.agent_name}:\n{dep_res.content[:1500]}\n"
+                elif isinstance(dep_res, dict):
+                    dep_context += f"\n{dep_res.get('agent_name', dep_id)}:\n{str(dep_res.get('content', ''))[:1500]}\n"
+            prompt += dep_context
         
-        return AgentResponse(
-            agent_name=self.name,
-            content=response,
-            reasoning="基于情感分析和法律风险评估模型",
-            actions=[
-                {"type": "sentiment_analysis", "description": "舆情分析完成"}
-            ]
-        )
+        try:
+            response = await self.chat(prompt, llm_config=llm_config)
+            
+            return AgentResponse(
+                agent_name=self.name,
+                content=response,
+                reasoning="基于情感分析和法律风险评估模型",
+                actions=[
+                    {"type": "sentiment_analysis", "description": "舆情分析完成"}
+                ]
+            )
+        except Exception as e:
+            return AgentResponse(
+                agent_name=self.name,
+                content=f"处理失败: {str(e)[:200]}",
+                metadata={"error": True}
+            )
     
     async def analyze_sentiment(self, content: str, keywords: Optional[List[str]] = None) -> Dict[str, Any]:
         """

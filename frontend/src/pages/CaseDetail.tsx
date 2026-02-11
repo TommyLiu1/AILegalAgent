@@ -22,7 +22,7 @@ const STATUS_MAP: Record<string, { label: string; color: string }> = {
   in_progress: { label: '进行中', color: 'bg-blue-100 text-blue-700' },
   under_review: { label: '审核中', color: 'bg-purple-100 text-purple-700' },
   completed: { label: '已完成', color: 'bg-green-100 text-green-700' },
-  closed: { label: '已关闭', color: 'bg-gray-100 text-gray-700' },
+  closed: { label: '已关闭', color: 'bg-muted text-foreground' },
 }
 
 const PRIORITY_MAP: Record<string, { label: string; color: string }> = {
@@ -142,7 +142,7 @@ export default function CaseDetail() {
         <button
           onClick={handleAnalyze}
           disabled={analyzing}
-          className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-700 text-white rounded-lg hover:opacity-90 disabled:opacity-50 shadow-md transition-all active:scale-95"
+          className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 shadow-md transition-all active:scale-95"
         >
           {analyzing ? (
             <Loader2 className="h-4 w-4 animate-spin" />
@@ -157,7 +157,7 @@ export default function CaseDetail() {
         {/* 案件信息 */}
         <div className="lg:col-span-2 space-y-6">
           {/* 基本信息 */}
-          <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
+          <div className="rounded-xl border bg-card shadow-legal-sm overflow-hidden">
             <div className="px-6 py-4 border-b bg-muted/30">
               <h2 className="text-lg font-semibold">案件基本描述</h2>
             </div>
@@ -170,7 +170,7 @@ export default function CaseDetail() {
 
           {/* AI分析结果 */}
           {(analysis || analyzing) && (
-            <div className="rounded-xl border border-indigo-100 bg-gradient-to-b from-indigo-50/30 to-white shadow-sm overflow-hidden">
+            <div className="rounded-xl border border-indigo-100 bg-gradient-to-b from-indigo-50/30 to-card shadow-legal-sm overflow-hidden">
               <div className="px-6 py-4 border-b border-indigo-100 flex items-center justify-between bg-indigo-50/50">
                 <div className="flex items-center gap-2">
                   <Sparkles className="h-5 w-5 text-indigo-600" />
@@ -195,7 +195,7 @@ export default function CaseDetail() {
                   <div className="space-y-6">
                     {/* 摘要展示 */}
                     {summary && (
-                      <div className="bg-white p-4 rounded-lg border border-indigo-100 shadow-sm italic text-indigo-800 border-l-4 border-l-indigo-500">
+                      <div className="bg-card p-4 rounded-lg border border-indigo-100 shadow-legal-sm italic text-indigo-800 border-l-4 border-l-indigo-500">
                         {summary}
                       </div>
                     )}
@@ -233,7 +233,7 @@ export default function CaseDetail() {
           )}
 
           {/* 时间线 */}
-          <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
+          <div className="rounded-xl border bg-card shadow-legal-sm overflow-hidden">
             <div className="px-6 py-4 border-b bg-muted/30">
               <h2 className="text-lg font-semibold">案件动态时间线</h2>
             </div>
@@ -247,10 +247,10 @@ export default function CaseDetail() {
                 <div className="relative space-y-6 before:absolute before:inset-0 before:ml-4 before:-translate-x-px before:h-full before:w-0.5 before:bg-gradient-to-b before:from-indigo-500 before:via-purple-500 before:to-transparent">
                   {timeline.map((event, index) => (
                     <div key={event.id || index} className="relative flex items-start gap-6 pl-10">
-                      <div className="absolute left-0 mt-1.5 h-8 w-8 -translate-x-1/2 rounded-full border-4 border-white bg-indigo-600 shadow-sm flex items-center justify-center">
-                        <div className="h-2 w-2 rounded-full bg-white" />
+                      <div className="absolute left-0 mt-1.5 h-8 w-8 -translate-x-1/2 rounded-full border-4 border-card bg-indigo-600 shadow-legal-sm flex items-center justify-center">
+                        <div className="h-2 w-2 rounded-full bg-card" />
                       </div>
-                      <div className="flex-1 bg-muted/20 p-4 rounded-lg border border-transparent hover:border-indigo-100 hover:bg-white transition-all shadow-sm group">
+                      <div className="flex-1 bg-muted/20 p-4 rounded-lg border border-transparent hover:border-indigo-100 hover:bg-card transition-all shadow-legal-sm group">
                         <div className="flex justify-between items-start mb-1">
                           <p className="font-bold text-foreground group-hover:text-indigo-700 transition-colors">
                             {event.title}
@@ -278,7 +278,7 @@ export default function CaseDetail() {
         {/* 侧边栏 */}
         <div className="space-y-6">
           {/* 案件画像 */}
-          <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
+          <div className="rounded-xl border bg-card shadow-legal-sm overflow-hidden">
             <div className="px-6 py-4 border-b bg-muted/30">
               <h3 className="font-semibold">案件画像</h3>
             </div>
@@ -323,7 +323,7 @@ export default function CaseDetail() {
           </div>
 
           {/* 快捷操作 */}
-          <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
+          <div className="rounded-xl border bg-card shadow-legal-sm overflow-hidden">
             <div className="px-6 py-4 border-b bg-muted/30">
               <h3 className="font-semibold">快捷法律工具</h3>
             </div>

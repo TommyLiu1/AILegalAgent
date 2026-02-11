@@ -9,7 +9,7 @@
  */
 
 import { memo, useState, useRef, useCallback, type ReactNode } from 'react';
-import { motion, AnimatePresence, useMotionValue, useTransform, PanInfo } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -39,24 +39,24 @@ export const CollapsibleCard = memo(function CollapsibleCard({
 
   return (
     <div className={cn(
-      'bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden',
+      'bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-100 dark:border-zinc-800 shadow-sm overflow-hidden',
       className,
     )}>
       {/* 标题栏 — 可点击折叠 */}
       <button
         onClick={() => setCollapsed(!collapsed)}
-        className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-gray-50/50 transition-colors"
+        className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-zinc-50/50 dark:hover:bg-zinc-800/50 transition-colors"
       >
         {icon && <div className="flex-shrink-0">{icon}</div>}
         <div className="flex-1 min-w-0">
-          <h4 className="text-sm font-semibold text-gray-800 truncate">{title}</h4>
-          {subtitle && <p className="text-[10px] text-gray-400 truncate">{subtitle}</p>}
+          <h4 className="text-sm font-semibold text-zinc-800 dark:text-zinc-200 truncate">{title}</h4>
+          {subtitle && <p className="text-[10px] text-zinc-400 dark:text-zinc-500 truncate">{subtitle}</p>}
         </div>
         <motion.div
           animate={{ rotate: collapsed ? 0 : 180 }}
           transition={{ duration: 0.2 }}
         >
-          <ChevronDown className="w-4 h-4 text-gray-400" />
+          <ChevronDown className="w-4 h-4 text-zinc-400 dark:text-zinc-500" />
         </motion.div>
       </button>
 
@@ -144,7 +144,7 @@ export const HorizontalSwipeList = memo(function HorizontalSwipeList({
                 'rounded-full transition-all duration-200',
                 i === activeIndex
                   ? 'w-4 h-1.5 bg-blue-500'
-                  : 'w-1.5 h-1.5 bg-gray-300',
+                  : 'w-1.5 h-1.5 bg-zinc-300 dark:bg-zinc-600',
               )}
             />
           ))}
@@ -183,7 +183,7 @@ export const BottomActionBar = memo(function BottomActionBar({
       animate={{ y: 0, opacity: 1 }}
       exit={{ y: 100, opacity: 0 }}
       className={cn(
-        'fixed bottom-0 left-0 right-0 z-30 bg-white border-t border-gray-200 px-4 py-3 safe-area-inset-bottom',
+        'fixed bottom-0 left-0 right-0 z-30 bg-white dark:bg-zinc-900 border-t border-zinc-200 dark:border-zinc-700 px-4 py-3 safe-area-inset-bottom',
         className,
       )}
     >
@@ -205,8 +205,8 @@ export const BottomActionBar = memo(function BottomActionBar({
                   : action.variant === 'destructive'
                   ? 'bg-red-500 text-white hover:bg-red-600'
                   : action.variant === 'outline'
-                  ? 'border border-gray-300 text-gray-700 hover:bg-gray-50'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200',
+                  ? 'border border-zinc-300 dark:border-zinc-600 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800'
+                  : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700',
                 (action.disabled || action.loading) && 'opacity-50 cursor-not-allowed',
               )}
             >
@@ -236,7 +236,7 @@ export const FullWidthCard = memo(function FullWidthCard({
 }: FullWidthCardProps) {
   return (
     <div className={cn(
-      'bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden',
+      'bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-100 dark:border-zinc-800 shadow-sm overflow-hidden',
       flush ? '-mx-4 rounded-none border-x-0' : '',
       className,
     )}>

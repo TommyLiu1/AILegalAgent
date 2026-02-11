@@ -63,10 +63,10 @@ const LEVEL_CONFIG = {
   },
   medium: {
     label: '中风险',
-    color: 'text-yellow-600',
-    bgColor: 'bg-yellow-50',
-    borderColor: 'border-yellow-200',
-    barColor: 'bg-yellow-500',
+    color: 'text-amber-600 dark:text-amber-400',
+    bgColor: 'bg-amber-50 dark:bg-amber-900/30',
+    borderColor: 'border-amber-200 dark:border-amber-800',
+    barColor: 'bg-amber-500',
     icon: AlertTriangle,
   },
   high: {
@@ -191,7 +191,7 @@ const RadarChart = memo(function RadarChart({
           y={axis.labelPos.y}
           textAnchor="middle"
           dominantBaseline="middle"
-          className="fill-gray-500"
+          className="fill-zinc-500 dark:fill-zinc-400"
           fontSize="8"
         >
           {axis.label}
@@ -224,14 +224,14 @@ export const RiskAssessmentCard = memo(function RiskAssessmentCard({
   };
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+    <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-100 dark:border-zinc-800 shadow-sm overflow-hidden">
       {/* 头部：总分 + 等级 */}
       <div className="px-4 pt-4 pb-3">
         <div className="flex items-center justify-between">
           <div>
-            <h4 className="text-sm font-semibold text-gray-800">{title}</h4>
+            <h4 className="text-sm font-semibold text-zinc-800 dark:text-zinc-200">{title}</h4>
             {subtitle && (
-              <p className="text-[10px] text-gray-400 mt-0.5">{subtitle}</p>
+              <p className="text-[10px] text-zinc-400 dark:text-zinc-500 mt-0.5">{subtitle}</p>
             )}
           </div>
           <div className={cn(
@@ -271,7 +271,7 @@ export const RiskAssessmentCard = memo(function RiskAssessmentCard({
           </div>
           <div className="flex-1 min-w-0">
             {summary && (
-              <p className="text-xs text-gray-600 leading-relaxed">{summary}</p>
+              <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed">{summary}</p>
             )}
           </div>
         </div>
@@ -291,8 +291,8 @@ export const RiskAssessmentCard = memo(function RiskAssessmentCard({
             const dimConfig = LEVEL_CONFIG[dim.level];
             return (
               <div key={dim.id} className="flex items-center gap-2">
-                <span className="text-[10px] text-gray-500 w-16 flex-shrink-0 truncate">{dim.label}</span>
-                <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                <span className="text-[10px] text-zinc-500 dark:text-zinc-400 w-16 flex-shrink-0 truncate">{dim.label}</span>
+                <div className="flex-1 h-1.5 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
                   <motion.div
                     className={cn('h-full rounded-full', dimConfig.barColor)}
                     initial={{ width: 0 }}
@@ -346,8 +346,8 @@ export const RiskAssessmentCard = memo(function RiskAssessmentCard({
                 action.variant === 'primary'
                   ? 'bg-blue-600 text-white hover:bg-blue-700 shadow-sm'
                   : action.variant === 'outline'
-                  ? 'border border-gray-200 text-gray-600 hover:bg-gray-50'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200',
+                  ? 'border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800'
+                  : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700',
               )}
             >
               {action.label}

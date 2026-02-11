@@ -445,7 +445,7 @@ export default function Collaboration() {
 
   // 协作编辑视图
   return (
-    <div className="h-screen flex flex-col">
+    <div className="h-full flex flex-col">
       {/* 顶部工具栏 */}
       <div className="border-b p-3 flex items-center justify-between bg-background">
         <div className="flex items-center gap-4">
@@ -617,7 +617,7 @@ export default function Collaboration() {
                       {collab.role === 'owner' ? '所有者' : '编辑者'}
                     </p>
                   </div>
-                  <div className={`h-2 w-2 rounded-full ${collab.is_online ? 'bg-green-500' : 'bg-gray-300'}`} />
+                  <div className={`h-2 w-2 rounded-full ${collab.is_online ? 'bg-green-500' : 'bg-muted-foreground/30'}`} />
                 </div>
               ))}
             </div>

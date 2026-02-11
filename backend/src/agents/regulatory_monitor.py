@@ -45,16 +45,22 @@ class RegulatoryMonitorAgent(BaseLegalAgent):
     
     async def process(self, task: Dict[str, Any]) -> AgentResponse:
         """处理监管监测任务"""
-        industry = task.get("industry", "通用")
-        region = task.get("region", "中国")
-        keywords = task.get("keywords", [])
+        description = task.get("description", "")
+        context = task.get("context", {})
+        llm_config = context.get("llm_config") or task.get("llm_config")
         
-        prompt = f"""
-请针对以下领域进行监管政策监测和解读：
+        # 兼容：如果有结构化字段则使用
+        industry = task.get("industry") or context.get("industry") or "通用"
+        region = task.get("region") or context.get("region") or "中国"
+        keywords = task.get("keywords") or context.get("keywords") or []
+        
+        prompt = f"""请针对以下需求进行监管政策监测和解读：
+
+用户需求：{description}
 
 关注行业：{industry}
 关注地区：{region}
-关键词：{', '.join(keywords)}
+{f'关键词：{", ".join(keywords)}' if keywords else ''}
 
 请提供：
 1. **最新法规速递**：近期出台或征求意见的重要法律法规。
@@ -63,14 +69,19 @@ class RegulatoryMonitorAgent(BaseLegalAgent):
 4. **行动建议**：企业应采取的应对措施（如制度修订、流程改造）。
 """
         
-        # 调用Agent
-        response = await self.chat(prompt)
-        
-        return AgentResponse(
-            agent_name=self.name,
-            content=response,
-            reasoning="基于最新监管动态和合规分析框架",
-            actions=[
-                {"type": "compliance_alert", "description": "发布合规预警通知"}
-            ]
-        )
+        try:
+            response = await self.chat(prompt, llm_config=llm_config)
+            return AgentResponse(
+                agent_name=self.name,
+                content=response,
+                reasoning="基于最新监管动态和合规分析框架",
+                actions=[
+                    {"type": "compliance_alert", "description": "发布合规预警通知"}
+                ]
+            )
+        except Exception as e:
+            return AgentResponse(
+                agent_name=self.name,
+                content=f"监管合规分析失败: {str(e)[:200]}",
+                metadata={"error": True}
+            )

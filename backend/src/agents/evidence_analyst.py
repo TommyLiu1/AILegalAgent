@@ -46,8 +46,10 @@ class EvidenceAnalystAgent(BaseLegalAgent):
         """处理证据分析任务"""
         # 任务描述
         description = task.get("description", "")
+        context = task.get("context") or {}
+        llm_config = context.get("llm_config") or task.get("llm_config")
         # 输入数据列表，包含类型和内容/路径
-        evidence_files = task.get("context", {}).get("evidence_files", [])
+        evidence_files = context.get("evidence_files", [])
         
         # 1. 模拟多模态预处理（实际项目中这里会调用 OCR/ASR 服务）
         processed_content = []
@@ -84,14 +86,31 @@ class EvidenceAnalystAgent(BaseLegalAgent):
 5. **补强建议**：目前证据链是否存在缺口？需要补充什么类型的证据（如：只有录音孤证，建议补充聊天记录或转账凭证）？
 """
         
-        # 调用Agent
-        response = await self.chat(prompt)
+        # Inject dependency results
+        dep_results = task.get("dependent_results", {})
+        if dep_results:
+            dep_context = "\n\n--- 前序分析结果 ---\n"
+            for dep_id, dep_res in dep_results.items():
+                if hasattr(dep_res, 'content'):
+                    dep_context += f"\n{dep_res.agent_name}:\n{dep_res.content[:1500]}\n"
+                elif isinstance(dep_res, dict):
+                    dep_context += f"\n{dep_res.get('agent_name', dep_id)}:\n{str(dep_res.get('content', ''))[:1500]}\n"
+            prompt += dep_context
         
-        return AgentResponse(
-            agent_name=self.name,
-            content=response,
-            reasoning="基于证据规则与逻辑推理",
-            actions=[
-                {"type": "evidence_processing", "description": "多模态证据处理与分析完成"}
-            ]
-        )
+        try:
+            response = await self.chat(prompt, llm_config=llm_config)
+            
+            return AgentResponse(
+                agent_name=self.name,
+                content=response,
+                reasoning="基于证据规则与逻辑推理",
+                actions=[
+                    {"type": "evidence_processing", "description": "多模态证据处理与分析完成"}
+                ]
+            )
+        except Exception as e:
+            return AgentResponse(
+                agent_name=self.name,
+                content=f"处理失败: {str(e)[:200]}",
+                metadata={"error": True}
+            )

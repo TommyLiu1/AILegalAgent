@@ -3,16 +3,16 @@ import { Award, Target, TrendingUp } from 'lucide-react';
 
 export function ProgressTracker() {
   const stats = [
-    { label: '文书质量分', value: '78', max: 100, icon: Award, color: '#007AFF', bg: 'bg-[#E5F3FF]' },
-    { label: '合规率', value: '85', max: 100, icon: Target, color: '#34C759', bg: 'bg-[#E8F8EE]' },
-    { label: '本周进步', value: '+12', icon: TrendingUp, color: '#AF52DE', bg: 'bg-[#F5EDFF]' },
+    { label: '文书质量分', value: '78', max: 100, icon: Award, color: 'hsl(var(--primary))', bg: 'bg-primary/10' },
+    { label: '合规率', value: '85', max: 100, icon: Target, color: 'hsl(var(--success))', bg: 'bg-success/10' },
+    { label: '本周进步', value: '+12', icon: TrendingUp, color: 'hsl(var(--accent))', bg: 'bg-accent/10' },
   ];
 
   return (
-    <div className="bg-white p-4 lg:p-6 border-b border-[#E5E5EA]">
+    <div className="bg-card p-4 lg:p-6 border-b border-border">
       <div className="flex items-center gap-2 mb-3 lg:mb-4">
-        <h3 className="font-semibold text-[#1C1C1E] text-sm lg:text-base">成长追踪</h3>
-        <span className="px-2 py-0.5 bg-[#E8F8EE] text-[#34C759] rounded-full text-xs font-medium">
+        <h3 className="font-semibold text-foreground text-sm lg:text-base">成长追踪</h3>
+        <span className="px-2 py-0.5 bg-success/10 text-success rounded-full text-xs font-medium">
           新人模式
         </span>
       </div>
@@ -32,10 +32,10 @@ export function ProgressTracker() {
               <div className={`w-10 h-10 lg:w-12 lg:h-12 rounded-xl ${stat.bg} flex items-center justify-center mx-auto mb-2 shadow-sm`} style={{ color: stat.color }}>
                 <Icon className="w-5 h-5 lg:w-6 lg:h-6" />
               </div>
-              <p className="text-xl lg:text-2xl font-bold text-[#1C1C1E]">{stat.value}</p>
-              <p className="text-xs text-[#8E8E93] mt-1">{stat.label}</p>
+              <p className="text-xl lg:text-2xl font-bold text-foreground">{stat.value}</p>
+              <p className="text-xs text-muted-foreground mt-1">{stat.label}</p>
               {stat.max && (
-                <div className="mt-2 h-1.5 bg-[#F2F2F7] rounded-full overflow-hidden">
+                <div className="mt-2 h-1.5 bg-muted rounded-full overflow-hidden">
                   <motion.div
                     initial={{ width: 0 }}
                     animate={{ width: `${(parseInt(stat.value) / stat.max) * 100}%` }}

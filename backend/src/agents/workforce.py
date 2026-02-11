@@ -21,6 +21,7 @@ from loguru import logger
 
 from src.agents.base import AgentResponse
 from src.agents.coordinator import CoordinatorAgent
+from src.services.a2ui_card_generator import generate_a2ui_components
 from src.agents.task_context import (
     AgentContext, MessagePool, AgentLifecycleManager,
     MemoryIntegration, MAX_DAG_ROUNDS, GLOBAL_TASK_TIMEOUT,
@@ -179,6 +180,12 @@ class LegalWorkforce:
                 skill_names = [s.name for s in matched_skills]
                 logger.info(f"匹配到相关技能: {skill_names}")
                 context["matched_skills"] = [s.to_dict() for s in matched_skills]
+                # 通知前端已匹配到专业技能
+                await _notify("thinking_content", {
+                    "agent": "技能引擎",
+                    "content": f"已激活 {len(matched_skills)} 个专业技能：{'、'.join(skill_names)}",
+                    "phase": "skill_matching",
+                })
         except Exception as e:
             logger.warning(f"技能匹配失败: {e}")
         
@@ -205,17 +212,34 @@ class LegalWorkforce:
             default_agents = []
             desc_lower = task_description.lower()
             
-            if any(kw in desc_lower for kw in ['合同', '协议', '起草', '草拟', '文书', '方案']):
+            if any(kw in desc_lower for kw in ['起草', '草拟', '写一份', '拟一份', '律师函', '法律文书', '法律意见书']):
                 default_agents.append({"id": "task_1", "agent": "document_drafter", "depends_on": []})
-                default_agents.append({"id": "task_2", "agent": "legal_advisor", "instruction_suffix": "审查并完善上述文书的法律合规性。", "depends_on": ["task_1"]})
-            elif any(kw in desc_lower for kw in ['审查', '审核', '合规']):
+            elif any(kw in desc_lower for kw in ['审查合同', '合同审查', '审核合同', '审查协议']):
                 default_agents.append({"id": "task_1", "agent": "contract_reviewer", "depends_on": []})
-                default_agents.append({"id": "task_2", "agent": "risk_assessor", "instruction_suffix": "评估合同风险。", "depends_on": ["task_1"]})
-            elif any(kw in desc_lower for kw in ['风险', '评估', '分析']):
+            elif any(kw in desc_lower for kw in ['合同', '协议']) and any(kw in desc_lower for kw in ['起草', '写']):
+                default_agents.append({"id": "task_1", "agent": "document_drafter", "depends_on": []})
+            elif any(kw in desc_lower for kw in ['合同', '协议']):
+                default_agents.append({"id": "task_1", "agent": "contract_reviewer", "depends_on": []})
+            elif any(kw in desc_lower for kw in ['尽调', '尽职调查', '背景调查', '企业调查', '查公司']):
+                default_agents.append({"id": "task_1", "agent": "due_diligence", "depends_on": []})
+            elif any(kw in desc_lower for kw in ['诉讼', '仲裁', '起诉', '胜诉', '败诉', '庭审']):
+                default_agents.append({"id": "task_1", "agent": "litigation_strategist", "depends_on": []})
+            elif any(kw in desc_lower for kw in ['知识产权', '专利', '商标', '侵权', '版权']):
+                default_agents.append({"id": "task_1", "agent": "ip_specialist", "depends_on": []})
+            elif any(kw in desc_lower for kw in ['员工', '辞退', '劳动', '入职', '社保', '工伤', '劳动人事']):
+                default_agents.append({"id": "task_1", "agent": "labor_compliance", "depends_on": []})
+            elif any(kw in desc_lower for kw in ['税', '财务', '发票', '报销']):
+                default_agents.append({"id": "task_1", "agent": "tax_compliance", "depends_on": []})
+            elif any(kw in desc_lower for kw in ['监管', '新规', '政策', '法规']):
+                default_agents.append({"id": "task_1", "agent": "regulatory_monitor", "depends_on": []})
+            elif any(kw in desc_lower for kw in ['证据', '录音', '鉴定']):
+                default_agents.append({"id": "task_1", "agent": "evidence_analyst", "depends_on": []})
+            elif any(kw in desc_lower for kw in ['签约', '签字', '盖章', '电子签']):
+                default_agents.append({"id": "task_1", "agent": "contract_steward", "depends_on": []})
+            elif any(kw in desc_lower for kw in ['审查', '审核', '合规']):
+                default_agents.append({"id": "task_1", "agent": "compliance_officer", "depends_on": []})
+            elif any(kw in desc_lower for kw in ['风险', '评估']):
                 default_agents.append({"id": "task_1", "agent": "risk_assessor", "depends_on": []})
-            elif any(kw in desc_lower for kw in ['诉讼', '仲裁', '纠纷']):
-                default_agents.append({"id": "task_1", "agent": "legal_researcher", "depends_on": []})
-                default_agents.append({"id": "task_2", "agent": "litigation_strategist", "depends_on": ["task_1"]})
             else:
                 # 兜底：法律顾问
                 default_agents.append({"id": "task_1", "agent": "legal_advisor", "depends_on": []})
@@ -320,17 +344,40 @@ class LegalWorkforce:
                 break
             
             executable_tasks = []
+            _failed_task_ids = set()
             for t_id in pending_task_ids:
                 task_info = plan_index.get(t_id)
                 if not task_info:
                     continue
                 dependencies = task_info.get("depends_on", [])
+                # 检查是否所有依赖都已执行完成（包括失败的依赖）
                 if all(dep in executed_tasks for dep in dependencies):
                     executable_tasks.append(task_info)
+                # 检查是否有依赖永远无法满足（依赖的任务不在计划中且不在已完成中）
+                elif any(dep not in plan_index and dep not in executed_tasks for dep in dependencies):
+                    logger.error(f"任务 {t_id} 的依赖 {dependencies} 无法满足，跳过")
+                    _failed_task_ids.add(t_id)
+            
+            # 移除无法满足依赖的任务
+            for _ft_id in _failed_task_ids:
+                pending_task_ids.remove(_ft_id)
+                executed_tasks[_ft_id] = AgentResponse(
+                    agent_name="system",
+                    content=f"任务 {_ft_id} 因依赖无法满足而被跳过",
+                    metadata={"error": True, "skipped": True}
+                )
             
             if not executable_tasks:
                 if pending_task_ids:
-                    logger.error(f"任务依赖配置错误，存在环路或未满足的依赖: {pending_task_ids}")
+                    logger.warning(f"没有可执行的任务，剩余 {len(pending_task_ids)} 个待处理任务: {pending_task_ids}")
+                    # 将所有剩余任务标记为不可执行并退出
+                    for _stuck_id in list(pending_task_ids):
+                        executed_tasks[_stuck_id] = AgentResponse(
+                            agent_name="system",
+                            content=f"任务因前置依赖失败而无法执行",
+                            metadata={"error": True, "dependency_failure": True}
+                        )
+                    pending_task_ids.clear()
                 break
                 
             # 并行执行当前层级的任务（带生命周期管理）
@@ -362,15 +409,28 @@ class LegalWorkforce:
                 if not t_info.get("instruction", "").strip():
                     t_info["instruction"] = context.get("original_message", "") or task_description
                 
-                # 技能动态注入
+                # 技能动态注入 — 已匹配的技能直接注入（匹配已在 match_skills 阶段完成）
                 if matched_skills:
                     skill_guidance = ""
+                    instr_lower = t_info.get("instruction", "").lower()
+                    a_name_lower = a_name.lower()
                     for skill in matched_skills:
-                        instr = t_info.get("instruction", "").lower()
-                        if skill.name in instr or any(trig in instr for trig in skill.triggers):
+                        # 宽松匹配：技能名、触发词、或 Agent 名称相关即注入
+                        is_relevant = (
+                            skill.name.replace("-", "_") in a_name_lower  # contract_review ↔ contract-review
+                            or any(trig.lower() in instr_lower for trig in skill.triggers)
+                            or skill.name.lower() in instr_lower
+                            or skill.description and any(kw in instr_lower for kw in skill.description.lower().split("，")[:3])
+                        )
+                        if is_relevant:
                             skill_guidance += f"\n\n【参考技能：{skill.name}】\n{skill.content[:2000]}\n"
+                    # 如果没有精确匹配但有匹配到的技能，也注入第一个
+                    if not skill_guidance and matched_skills:
+                        skill = matched_skills[0]
+                        skill_guidance = f"\n\n【参考技能：{skill.name}】\n{skill.content[:2000]}\n"
                     if skill_guidance:
                         t_info["instruction"] = t_info.get("instruction", "") + skill_guidance
+                        logger.info(f"已注入技能到任务 {t_id} 的指令中")
                 
                 # 通知前端
                 await _notify("agent_task_start", {
@@ -485,13 +545,44 @@ class LegalWorkforce:
         # 保存消息池状态
         await memory_integration.save_message_pool(message_pool)
         
-        # 3. 条件触发共识机制
+        # 3. 区分成功/失败的结果
         results_list = list(executed_tasks.values())
-        consensus_res = await self._maybe_run_consensus(task_description, results_list)
+        successful_results = [
+            r for r in results_list
+            if isinstance(r, AgentResponse) and not r.metadata.get("error")
+        ]
+        failed_results = [
+            r for r in results_list
+            if isinstance(r, AgentResponse) and r.metadata.get("error")
+        ]
+        
+        # 只对成功结果进行共识（失败的不参与）
+        if len(successful_results) >= 2:
+            consensus_res = await self._maybe_run_consensus(task_description, successful_results)
+        else:
+            consensus_res = None
         
         # 4. 汇总结果
-        all_results = results_list + ([consensus_res] if consensus_res else [])
-        final_result = await self.coordinator.aggregate_results(all_results)
+        # 如果有成功结果，优先用成功结果聚合
+        aggregation_input = successful_results + ([consensus_res] if consensus_res else [])
+        if aggregation_input:
+            final_result = await self.coordinator.aggregate_results(aggregation_input)
+        elif failed_results:
+            # 所有任务都失败了，构建错误汇总
+            error_details = "; ".join(
+                f"{r.agent_name}: {r.content[:100]}"
+                for r in failed_results
+            )
+            final_result = (
+                f"很抱歉，本次处理未能成功完成。\n\n"
+                f"**错误详情**：{error_details}\n\n"
+                f"**建议**：\n"
+                f"1. 请检查 LLM 配置是否正确（设置 → LLM 配置）\n"
+                f"2. 确保网络连接正常\n"
+                f"3. 稍后重试或简化您的需求描述"
+            )
+        else:
+            final_result = "任务执行完成但未产生有效结果，请重试。"
 
         # 5. 存储情景记忆（增强版：包含各 Agent 推理链和重试次数）
         memory_id = None
@@ -508,6 +599,27 @@ class LegalWorkforce:
         elapsed = time.time() - task_start_time
         logger.info(f"任务处理完成，耗时 {elapsed:.2f}s，涉及 {len(results_list)} 个Agent")
         
+        # 6. 自动生成 A2UI 卡片组件（打通流式卡片管线）
+        a2ui_components = []
+        intent = analysis.get("intent", "")
+        response_strategy = analysis.get("response_strategy", "chat_only")
+        
+        # 先收集各 Agent 已有的 a2ui 数据
+        for r in results_list:
+            if isinstance(r, AgentResponse) and r.metadata:
+                existing_a2ui = r.metadata.get("a2ui", {})
+                if existing_a2ui.get("components"):
+                    a2ui_components.extend(existing_a2ui["components"])
+        
+        # 如果 Agent 自身没有产出 A2UI，则自动生成
+        if not a2ui_components and isinstance(final_result, str):
+            a2ui_components = generate_a2ui_components(
+                intent=intent,
+                response_text=final_result,
+                task_description=task_description,
+                response_strategy=response_strategy,
+            )
+        
         return {
             "task": task_description,
             "analysis": analysis,
@@ -517,6 +629,7 @@ class LegalWorkforce:
             ],
             "consensus": consensus_res.model_dump() if consensus_res else None,
             "final_result": final_result,
+            "a2ui_components": a2ui_components,
             "memory_id": memory_id,
             "elapsed_seconds": round(elapsed, 2),
         }
@@ -547,12 +660,21 @@ class LegalWorkforce:
         deps = t_info.get("depends_on", [])
         dep_results = {dep: executed_tasks[dep] for dep in deps if dep in executed_tasks}
         
-        # 技能动态注入
+        # 技能动态注入 — 已匹配的技能直接注入
         skill_guidance = ""
         if matched_skills:
+            instr_lower = instruction.lower()
+            agent_lower = agent_name.lower()
             for skill in matched_skills:
-                if skill.name in instruction.lower() or any(trig in instruction.lower() for trig in skill.triggers):
+                is_relevant = (
+                    skill.name.replace("-", "_") in agent_lower
+                    or any(trig.lower() in instr_lower for trig in skill.triggers)
+                    or skill.name.lower() in instr_lower
+                )
+                if is_relevant:
                     skill_guidance += f"\n\n【参考技能：{skill.name}】\n{skill.content[:2000]}\n"
+            if not skill_guidance and matched_skills:
+                skill_guidance = f"\n\n【参考技能：{matched_skills[0].name}】\n{matched_skills[0].content[:2000]}\n"
         
         final_instruction = instruction + skill_guidance
         

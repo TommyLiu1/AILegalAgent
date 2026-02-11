@@ -428,7 +428,11 @@ async def websocket_chat(websocket: WebSocket, session_id: str):
         conversation_id = session_id  # 即使数据库操作失败也保持 session_id
     
     # 订阅 EventBus
+    _ws_connected = True  # 连接状态标记
+    
     async def event_handler(event_data):
+        if not _ws_connected:
+            return
         try:
             await websocket.send_json({"type": "event_bus_msg", "data": event_data})
         except Exception:
@@ -436,10 +440,43 @@ async def websocket_chat(websocket: WebSocket, session_id: str):
 
     await event_bus.subscribe("agent_events", event_handler)
 
+    # --- 心跳机制 ---
+    import time as _time
+    _last_activity = _time.monotonic()  # 最后活动时间
+    _heartbeat_interval = 30  # 30 秒心跳间隔
+    _idle_timeout = 600  # 10 分钟空闲超时
+    
+    async def _heartbeat_loop():
+        """定期发送心跳，检测死连接"""
+        nonlocal _ws_connected, _last_activity
+        while _ws_connected:
+            await asyncio.sleep(_heartbeat_interval)
+            if not _ws_connected:
+                break
+            try:
+                # 检查空闲超时
+                idle_secs = _time.monotonic() - _last_activity
+                if idle_secs > _idle_timeout:
+                    logger.info(f"WebSocket 空闲超时 ({idle_secs:.0f}s): {session_id}")
+                    _ws_connected = False
+                    await websocket.close(1000, "idle timeout")
+                    break
+                # 发送心跳
+                await websocket.send_json({"type": "pong", "timestamp": _time.time()})
+            except Exception:
+                _ws_connected = False
+                break
+    
+    _heartbeat_task = asyncio.create_task(_heartbeat_loop())
+
     # --- 辅助函数 ---
     async def _send(event_type: str, data: dict):
         """安全发送 WebSocket 消息"""
+        nonlocal _last_activity
+        if not _ws_connected:
+            return
         try:
+            _last_activity = _time.monotonic()
             await websocket.send_json({**data, "type": event_type, "session_id": session_id})
         except Exception as e:
             logger.warning(f"WS 发送失败: {e}")
@@ -583,10 +620,16 @@ async def websocket_chat(websocket: WebSocket, session_id: str):
     try:
         while True:
             data = await websocket.receive_json()
+            _last_activity = _time.monotonic()  # 更新活动时间
             msg_type = data.get("type", "message")
             content = data.get("content", "")
             agent_name = data.get("agent_name")
             privacy_mode = data.get("privacy_mode", "HYBRID")
+            
+            # === 心跳 ping 处理 ===
+            if msg_type == "ping":
+                await _send("pong", {"timestamp": _time.time()})
+                continue
             
             # === A2UI 事件处理 ===
             if msg_type == "a2ui_event":
@@ -596,6 +639,7 @@ async def websocket_chat(websocket: WebSocket, session_id: str):
                 a2ui_form_data = data.get("form_data", {})
                 logger.info(f"[A2UI Event] action={a2ui_action_id}, component={a2ui_component_id}")
                 
+                a2ui_response = None  # 初始化，确保 fallback 检查可用
                 try:
                     from src.services.a2ui_intent_handler import handle_a2ui_event as _handle_a2ui_evt
                     a2ui_response = await _handle_a2ui_evt(
@@ -628,10 +672,14 @@ async def websocket_chat(websocket: WebSocket, session_id: str):
                         # 如果没有匹配的 A2UI 处理器，将 action 作为用户消息发送到 LLM
                         content = f"用户执行了操作: {a2ui_action_id}"
                         # 不 continue，让后续 Agent 逻辑处理
+                        msg_type = "message"  # 重置类型以进入正常对话流
                 except Exception as e:
                     logger.error(f"A2UI 事件处理失败: {e}", exc_info=True)
                     await _send("error", {"content": f"操作处理失败: {str(e)}"})
-                continue
+                    continue
+                # 只有成功处理了 A2UI（有response）时才 continue，否则让 fallback 继续
+                if a2ui_response is not None:
+                    continue
 
             # === 工作台确认回复 ===
             if msg_type == "workspace_confirmation_response":
@@ -747,10 +795,19 @@ async def websocket_chat(websocket: WebSocket, session_id: str):
                 agent_key = "document_drafter"
                 if agent_key not in workforce.agents:
                     # 回退使用法律顾问 Agent
+                    if not workforce.agents:
+                        await _send("error", {"content": "系统尚未初始化完成，请稍后再试。"})
+                        continue
                     agent_key = "legal_advisor" if "legal_advisor" in workforce.agents else list(workforce.agents.keys())[0]
                     logger.warning(f"document_drafter 不可用，回退使用 {agent_key}")
                 
                 llm_config = await _load_llm_config()
+                if not llm_config:
+                    await _send("error", {
+                        "content": "尚未配置 AI 模型，请在「设置」页面配置 LLM 后再试。",
+                        "action": "settings",
+                    })
+                    continue
                 
                 await _send("agent_thinking", {"agent": "文书起草Agent", "message": "正在优化文档内容..."})
                 
@@ -814,6 +871,25 @@ async def websocket_chat(websocket: WebSocket, session_id: str):
             # === 加载 LLM 配置 ===
             llm_config = await _load_llm_config()
             
+            # 验证 LLM 配置有效性
+            if not llm_config:
+                logger.warning("未找到任何 LLM 配置")
+                await _send("error", {
+                    "content": "未配置 LLM 服务。请先在「设置 → LLM 配置」中配置 API Key 和模型。",
+                    "action": "check_api_key",
+                    "can_retry": False,
+                })
+                continue
+            
+            _api_key = getattr(llm_config, "api_key", "") or ""
+            _is_dummy = not _api_key or _api_key.startswith("dummy") or _api_key.startswith("sk-test") or len(_api_key) < 10
+            if _is_dummy:
+                logger.warning(f"LLM 配置使用了测试/无效 API Key: {_api_key[:10]}...")
+                await _send("system_notice", {
+                    "content": "⚠️ 当前使用的是测试 API Key，所有回复均为模拟数据。如需真实 AI 分析，请在设置中配置有效的 API Key。",
+                    "level": "warning",
+                })
+            
             # === 2. 快速路径判断 — 简单消息直接回复，跳过需求分析 ===
             
             # 规则引擎：判断是否是简单消息（无需 LLM 调用）
@@ -851,11 +927,12 @@ async def websocket_chat(websocket: WebSocket, session_id: str):
             _is_complex_by_keyword = any(kw in content for kw in _complex_keywords)
             
             if msg_type == "clarification_response":
-                # 合并澄清回复和原始问题
+                # 合并澄清回复和原始问题（不重复保存，已在上方 line ~845 保存过原始 content）
                 original = data.get("original_content", "")
                 selections = data.get("selections", "")
                 content = f"{original}\n\n用户补充信息：{content}\n选择：{selections}"
-                await _save_message("user", content)
+                # 更新已保存的消息内容（用合并后的内容替代原始内容）
+                _last_user_content = content
                 req_analysis = {"is_complete": True, "summary": content[:100], "complexity": "moderate"}
                 _is_simple = False
                 _is_complex_by_keyword = True
@@ -975,66 +1052,127 @@ async def websocket_chat(websocket: WebSocket, session_id: str):
                     if _response_strategy == "workspace":
                         await _send("panel_trigger", {"reason": "complex_task", "tab": "smart"})
                     
-                    # 提取 A2UI 数据
+                    # 提取 A2UI 数据（优先使用 Workforce 自动生成的组件）
                     a2ui_data = None
-                    a2ui_components = []
-                    for res in result.get("agent_results", []):
-                        if isinstance(res, dict) and res.get("metadata", {}).get("a2ui"):
-                            a2ui_data = res["metadata"]["a2ui"]
-                            # 提取内嵌组件列表（用于流式推送）
-                            if isinstance(a2ui_data, dict) and a2ui_data.get("components"):
-                                a2ui_components.extend(a2ui_data["components"])
-                            elif isinstance(a2ui_data, dict) and a2ui_data.get("a2ui", {}).get("components"):
-                                a2ui_components.extend(a2ui_data["a2ui"]["components"])
+                    a2ui_components = result.get("a2ui_components", []) or []
                     
-                    # 提取响应文本（先于 A2UI 推送，以便确定 agent 名称）
-                    response_text = result.get("final_result", {}).get("summary", "")
+                    # 如果 Workforce 没有生成，再从各 Agent metadata 中提取
+                    if not a2ui_components:
+                        for res in result.get("agent_results", []):
+                            if isinstance(res, dict) and res.get("metadata", {}).get("a2ui"):
+                                a2ui_data = res["metadata"]["a2ui"]
+                                if isinstance(a2ui_data, dict) and a2ui_data.get("components"):
+                                    a2ui_components.extend(a2ui_data["components"])
+                                elif isinstance(a2ui_data, dict) and a2ui_data.get("a2ui", {}).get("components"):
+                                    a2ui_components.extend(a2ui_data["a2ui"]["components"])
+                    
+                    # 提取响应文本（先于 A2UI 推送）
+                    _final = result.get("final_result")
+                    if isinstance(_final, dict):
+                        response_text = _final.get("summary", "") or _final.get("content", "")
+                    elif isinstance(_final, str):
+                        response_text = _final
+                    else:
+                        response_text = ""
+                    
                     if not response_text:
-                        # 尝试从 agent_results 中提取内容
+                        # 从 agent_results 中提取有效内容（跳过错误结果）
                         for ar in result.get("agent_results", []):
-                            if isinstance(ar, dict) and ar.get("content"):
+                            if isinstance(ar, dict) and ar.get("content") and not ar.get("metadata", {}).get("error"):
                                 response_text = ar["content"]
                                 break
+                    
                     if not response_text:
-                        response_text = await workforce.chat(content, context={"llm_config": llm_config})
+                        # 所有结果都失败了，从失败结果中提取错误信息
+                        error_summaries = []
+                        for ar in result.get("agent_results", []):
+                            if isinstance(ar, dict) and ar.get("content"):
+                                error_summaries.append(ar["content"])
+                        if error_summaries:
+                            response_text = "\n\n".join(error_summaries)
+                        else:
+                            # 最后降级到单 Agent 对话
+                            try:
+                                response_text = await workforce.chat(content, context={"llm_config": llm_config})
+                            except Exception as fallback_err:
+                                response_text = f"任务处理失败，降级对话也未能完成: {str(fallback_err)[:200]}"
+                    
                     used_agent = "智能体团队"
                     
-                    # 根据 response_strategy 控制 A2UI 发送
-                    # chat_only → 不发送 A2UI（纯文本对话）
-                    # chat_with_a2ui / chat_with_streaming_a2ui → 流式推送 A2UI 到对话流（内联卡片）
+                    # 根据 response_strategy 控制 A2UI 发送方式
+                    # chat_with_streaming_a2ui → 千问 StreamObject 风格，逐个流式推送
+                    # chat_with_a2ui / chat_only(有卡片) → 一次性推送内联卡片
                     # workspace → 推送到右侧面板
-                    if _response_strategy != "chat_only":
-                        if a2ui_components and _response_strategy in ("chat_with_a2ui", "chat_with_streaming_a2ui"):
+                    if a2ui_components:
+                        if _response_strategy == "chat_with_streaming_a2ui":
                             # 千问 StreamObject 风格：逐个流式推送 A2UI 组件到对话流
                             await _stream_a2ui_components(
                                 a2ui_components,
                                 agent=used_agent,
                                 delay=0.04,  # 40ms 极速出卡片
                             )
-                        elif a2ui_data:
+                        elif _response_strategy == "workspace" and a2ui_data:
                             # workspace 策略：推送到右侧面板
                             await _send("context_update", {"context_type": "a2ui", "data": a2ui_data})
+                        else:
+                            # chat_with_a2ui 或 chat_only 但有自动生成的卡片 → 一次性推送
+                            await _stream_a2ui_components(
+                                a2ui_components,
+                                agent=used_agent,
+                                delay=0.02,  # 20ms 快速出卡片
+                            )
                     
                     # 流式推送多智能体结果（而非一次性 done）
                     await _stream_response_tokens(response_text, used_agent)
                     
-                    # === 智能 Canvas 自动打开 — 仅在 workspace 策略下触发 ===
+                    # === 智能 Canvas 自动打开 — 根据任务类型智能触发（不限策略） ===
+                    # 注意：不再限制 _response_strategy == "workspace"，只要是文档类任务就打开 Canvas
                     intent = result.get("analysis", {}).get("intent", "")
                     _is_doc_task = intent in ("DOCUMENT_DRAFTING", "CONTRACT_REVIEW", "CONTRACT_MANAGEMENT") or \
-                        any(kw in content for kw in ['起草', '草拟', '协议', '合同', '文书', '方案', '律师函'])
+                        any(kw in content for kw in ['起草', '草拟', '协议', '合同', '文书', '方案', '律师函', '条款', '审查', '起诉书', '答辩状', '委托书'])
                     
-                    if _response_strategy == "workspace" and _is_doc_task and len(response_text) > 200:
+                    if _is_doc_task and len(response_text) > 200 and not response_text.startswith("处理失败") and not response_text.startswith("很抱歉"):
                         canvas_type = "contract" if any(kw in content for kw in ['合同', '协议', '合伙']) else "document"
                         await _send("canvas_open", {
                             "type": canvas_type,
                             "title": req_analysis.get("summary", "文档")[:50],
                             "content": response_text,
                         })
+                        # 同时推送文档就绪事件，提供后续操作
+                        await _send("document_ready", {
+                            "title": req_analysis.get("summary", "文档")[:50],
+                            "suggest_signing": any(kw in content for kw in ['签约', '盖章', '签署']),
+                            "suggest_lawyer": any(kw in content for kw in ['审核', '审查', '复核']),
+                        })
                     
                 else:
-                    # 单智能体对话 — 直接回复，无需多余的思考事件
-                    target_agent = agent_name or "legal_advisor"
-                    display_name = agent_name or "法律顾问Agent"
+                    # 单智能体对话 — 使用需求分析推荐的 Agent，而非固定用 legal_advisor
+                    _suggested = req_analysis.get("suggested_agents", [])
+                    if agent_name:
+                        target_agent = agent_name
+                    elif _suggested and _suggested[0] in workforce.agents:
+                        target_agent = _suggested[0]
+                    else:
+                        target_agent = "legal_advisor"
+                    
+                    # 获取 Agent 显示名称
+                    _agent_display_map = {
+                        "legal_advisor": "法律顾问Agent",
+                        "contract_reviewer": "合同审查Agent",
+                        "document_drafter": "文书起草Agent",
+                        "risk_assessor": "风险评估Agent",
+                        "litigation_strategist": "诉讼策略Agent",
+                        "ip_specialist": "知识产权Agent",
+                        "labor_compliance": "劳动合规Agent",
+                        "tax_compliance": "税务合规Agent",
+                        "regulatory_monitor": "监管监测Agent",
+                        "due_diligence": "尽职调查Agent",
+                        "evidence_analyst": "证据分析Agent",
+                        "compliance_officer": "合规审查Agent",
+                        "legal_researcher": "法律研究Agent",
+                        "contract_steward": "合同管家Agent",
+                    }
+                    display_name = _agent_display_map.get(target_agent, target_agent)
                     
                     # 如果有自然追问提示，注入到单 Agent 输入中
                     _agent_input = content
@@ -1046,16 +1184,35 @@ async def websocket_chat(websocket: WebSocket, session_id: str):
                     try:
                         token_var = _task_llm_config_var.set(llm_config)
                         try:
-                            agent_obj = workforce.agents.get(target_agent, workforce.agents["legal_advisor"])
+                            agent_obj = workforce.agents.get(target_agent)
+                            if not agent_obj:
+                                # 目标 Agent 不存在，使用 legal_advisor 作为默认
+                                agent_obj = workforce.agents.get("legal_advisor") or (list(workforce.agents.values())[0] if workforce.agents else None)
+                                if not agent_obj:
+                                    await _send("error", {"content": "系统尚未初始化完成，请稍后再试。"})
+                                    raise RuntimeError("No agents available")
+                                logger.warning(f"Agent '{target_agent}' 不存在，使用 '{agent_obj.name}' 代替")
+                                display_name = agent_obj.name
+                            
                             token_queue = await agent_obj.stream_chat(_agent_input, llm_config=llm_config)
                             
                             accumulated = ""
+                            _idle_count = 0
                             while True:
-                                tok = await asyncio.wait_for(token_queue.get(), timeout=60.0)
+                                try:
+                                    tok = await asyncio.wait_for(token_queue.get(), timeout=120.0)
+                                except asyncio.TimeoutError:
+                                    _idle_count += 1
+                                    if _idle_count >= 2:
+                                        logger.warning(f"流式输出连续超时 {_idle_count} 次，终止等待")
+                                        break
+                                    continue
+                                
                                 if tok is None:
                                     break
                                 if tok.startswith("[Error]"):
                                     raise Exception(tok)
+                                _idle_count = 0  # 收到 token，重置空闲计数
                                 accumulated += tok
                                 await _send("content_token", {
                                     "token": tok,
@@ -1065,19 +1222,48 @@ async def websocket_chat(websocket: WebSocket, session_id: str):
                             
                             response_text = accumulated
                             used_agent = display_name
+                            
+                            # 空回复防护：如果流式输出未产生任何内容，降级到同步调用
+                            if not response_text.strip():
+                                logger.warning("流式输出返回空内容，尝试同步降级")
+                                raise Exception("Empty streaming response")
                         finally:
                             _task_llm_config_var.reset(token_var)
                     except Exception as stream_err:
                         logger.warning(f"流式输出失败，降级到同步: {stream_err}")
-                        response_text = await workforce.chat(_agent_input, agent_name, context={"llm_config": llm_config})
+                        try:
+                            response_text = await workforce.chat(_agent_input, agent_name, context={"llm_config": llm_config})
+                        except Exception as sync_err:
+                            logger.error(f"同步降级也失败: {sync_err}")
+                            response_text = f"处理失败: {str(stream_err)[:200]}"
                         used_agent = agent_name or "法律顾问Agent"
                         # 将同步结果流式推送
-                        await _stream_response_tokens(response_text, used_agent)
+                        if response_text:
+                            await _stream_response_tokens(response_text, used_agent)
                 
                 # === 隐私还原 ===
                 if recovery_map:
                     response_text = pii_service.restore(response_text, recovery_map)
                     response_text += "\n\n*(注：本回复基于脱敏数据生成，敏感信息已在本地自动还原)*"
+                
+                # === 单 Agent 路径的 Canvas 自动打开 ===
+                # 当单 Agent 处理文档任务时，也自动打开 Canvas（前面多 Agent 路径已处理）
+                _single_doc_keywords = ['起草', '草拟', '协议', '合同', '文书', '方案', '律师函',
+                                        '条款', '审查', '起诉书', '答辩状', '委托书', '模板']
+                _is_single_doc_task = any(kw in content for kw in _single_doc_keywords)
+                if not is_complex and _is_single_doc_task and len(response_text) > 200 and not response_text.startswith("处理失败"):
+                    _s_canvas_type = "contract" if any(kw in content for kw in ['合同', '协议', '合伙']) else "document"
+                    _s_title = content[:30].strip() if len(content) < 50 else content[:30].strip() + "..."
+                    await _send("canvas_open", {
+                        "type": _s_canvas_type,
+                        "title": _s_title,
+                        "content": response_text,
+                    })
+                    await _send("document_ready", {
+                        "title": _s_title,
+                        "suggest_signing": any(kw in content for kw in ['签约', '盖章', '签署']),
+                        "suggest_lawyer": any(kw in content for kw in ['审核', '审查', '复核']),
+                    })
                 
                 # === 生成 A2UI — 仅在非 chat_only 策略时发送 ===
                 if _response_strategy != "chat_only":
@@ -1112,8 +1298,39 @@ async def websocket_chat(websocket: WebSocket, session_id: str):
                 await _save_message("assistant", response_text, used_agent)
                 
             except Exception as e:
-                logger.error(f"智能体调用失败: {e}")
-                await _send("error", {"content": f"处理失败: {str(e)}"})
+                logger.error(f"智能体调用失败: {e}", exc_info=True)
+                
+                # 构建用户友好的错误消息
+                error_str = str(e)
+                if "401" in error_str or "认证" in error_str or "API key" in error_str.lower():
+                    user_error = "API 密钥无效或已过期，请在设置中检查您的 LLM 配置。"
+                    error_action = "check_api_key"
+                elif "429" in error_str or "速率限制" in error_str or "rate limit" in error_str.lower():
+                    user_error = "请求过于频繁，请稍等片刻后重试。"
+                    error_action = "retry_later"
+                elif "timeout" in error_str.lower() or "超时" in error_str:
+                    user_error = "请求超时，可能是网络波动或服务繁忙。您可以点击重试。"
+                    error_action = "retry"
+                elif "连接" in error_str or "connect" in error_str.lower():
+                    user_error = "无法连接到 AI 服务，请检查网络连接或稍后重试。"
+                    error_action = "retry"
+                else:
+                    user_error = f"处理过程中出现异常，请稍后重试。"
+                    error_action = "retry"
+                
+                await _send("error", {
+                    "content": user_error,
+                    "detail": error_str[:300],
+                    "action": error_action,
+                    "can_retry": error_action == "retry",
+                    "original_content": content[:200] if content else "",
+                })
+                # 即使出错也发送 done 事件，防止前端卡在 loading 状态
+                await _send("done", {
+                    "error": True,
+                    "conversation_id": conversation_id,
+                    "content": user_error,
+                })
             
     except WebSocketDisconnect:
         logger.info(f"WebSocket断开连接: {session_id}")
@@ -1122,6 +1339,22 @@ async def websocket_chat(websocket: WebSocket, session_id: str):
         logger.info(f"WebSocket运行时断开: {session_id} ({e})")
     except Exception as e:
         logger.error(f"WebSocket未知异常: {session_id} - {e}")
+    finally:
+        # === 清理资源 ===
+        _ws_connected = False
+        # 取消心跳任务
+        if _heartbeat_task and not _heartbeat_task.done():
+            _heartbeat_task.cancel()
+            try:
+                await _heartbeat_task
+            except (asyncio.CancelledError, Exception):
+                pass
+        # 取消 EventBus 订阅
+        try:
+            await event_bus.unsubscribe("agent_events", event_handler)
+        except Exception:
+            pass
+        logger.info(f"WebSocket 资源已清理: {session_id}")
 
 
 @router.post("/feedback/memory", response_model=UnifiedResponse)

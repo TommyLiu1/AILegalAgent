@@ -40,14 +40,29 @@ class LaborComplianceAgent(BaseLegalAgent):
     
     async def process(self, task: Dict[str, Any]) -> AgentResponse:
         """处理劳动人事任务"""
-        action = task.get("action", "consult") # consult, publish_policy
         description = task.get("description", "")
         context = task.get("context", {})
+        llm_config = context.get("llm_config") or task.get("llm_config")
         
-        if action == "publish_policy":
-            return await self._publish_policy_and_track(description, context)
-        else:
-            return await self._general_consult(description, context)
+        action = task.get("action") or context.get("action") or "consult"
+        
+        # 从描述中推断动作类型
+        if action == "consult":
+            desc_lower = description.lower()
+            if any(kw in desc_lower for kw in ["发布制度", "发布通知", "全员签收", "制度宣贯"]):
+                action = "publish_policy"
+        
+        try:
+            if action == "publish_policy":
+                return await self._publish_policy_and_track(description, context)
+            else:
+                return await self._general_consult(description, context, llm_config=llm_config)
+        except Exception as e:
+            return AgentResponse(
+                agent_name=self.name,
+                content=f"劳动合规分析失败: {str(e)[:200]}",
+                metadata={"error": True}
+            )
 
     async def _publish_policy_and_track(self, description: str, context: Dict[str, Any]) -> AgentResponse:
         """发布制度并追踪全员签署"""
@@ -86,9 +101,16 @@ class LaborComplianceAgent(BaseLegalAgent):
             ]
         )
 
-    async def _general_consult(self, description: str, context: Dict[str, Any]) -> AgentResponse:
+    async def _general_consult(self, description: str, context: Dict[str, Any], llm_config=None) -> AgentResponse:
         """通用咨询"""
-        # ... (保留原有的 LLM 回答逻辑)
-        prompt = f"请针对：{description} 提供合规建议。背景：{context}"
-        content = await self.chat(prompt)
+        # 注入前序 Agent 的结果
+        dep_results = context.get("dependent_results", {})
+        dep_context = ""
+        if dep_results:
+            for dep_id, dep_res in dep_results.items():
+                if hasattr(dep_res, 'content'):
+                    dep_context += f"\n前序分析（{dep_res.agent_name}）：{dep_res.content[:1000]}\n"
+        
+        prompt = f"请针对以下劳动人事问题提供专业的合规建议：\n\n{description}{dep_context}"
+        content = await self.chat(prompt, llm_config=llm_config)
         return AgentResponse(agent_name=self.name, content=content)

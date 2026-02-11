@@ -25,6 +25,22 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"⚠️ 数据库初始化跳过: {e}")
     
+    # 初始化 MCP 客户端服务（加载已配置的 MCP 服务器连接）
+    try:
+        from src.services.mcp_client_service import mcp_client_service
+        await mcp_client_service.initialize()
+        logger.info("✅ MCP 客户端服务初始化完成")
+    except Exception as e:
+        logger.warning(f"⚠️ MCP 客户端初始化跳过: {e}")
+    
+    # 预加载技能库
+    try:
+        from src.services.skill_service import skill_service
+        skill_service.load_skills()
+        logger.info(f"✅ 技能库加载完成: {len(skill_service.skills)} 个技能")
+    except Exception as e:
+        logger.warning(f"⚠️ 技能库加载跳过: {e}")
+    
     logger.info(f"📍 API文档: http://localhost:{settings.BACKEND_PORT}/docs")
     
     yield
@@ -37,6 +53,14 @@ async def lifespan(app: FastAPI):
         logger.info("已关闭共享 httpx 连接池")
     except Exception as e:
         logger.warning(f"关闭 httpx 连接池失败: {e}")
+    
+    # 关闭 MCP 连接
+    try:
+        from src.services.mcp_client_service import mcp_client_service
+        await mcp_client_service.close()
+        logger.info("已关闭 MCP 连接")
+    except Exception as e:
+        logger.warning(f"关闭 MCP 连接失败: {e}")
     
     # 关闭事件总线
     try:

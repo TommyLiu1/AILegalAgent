@@ -44,20 +44,20 @@ export function AIAssistant() {
   // 移动端布局
   if (isMobile) {
     return (
-      <div className="h-full flex flex-col bg-white">
+      <div className="h-full flex flex-col bg-card">
         {/* Progress Tracker - 固定在顶部 */}
-        <div className="border-b border-[#E5E5EA]">
+        <div className="border-b border-border">
           <ProgressTracker />
         </div>
 
         {/* Tab Navigation */}
-        <div className="border-b border-[#E5E5EA] bg-white px-2 py-2 flex gap-2 overflow-x-auto">
+        <div className="border-b border-border bg-card px-2 py-2 flex gap-2 overflow-x-auto">
           <button
             onClick={() => setMobileTab('editor')}
             className={`flex-1 min-w-[100px] px-4 py-2.5 rounded-xl text-sm font-medium transition-all flex items-center justify-center gap-2 whitespace-nowrap ${
               mobileTab === 'editor'
-                ? 'bg-[#007AFF] text-white shadow-sm'
-                : 'bg-[#F2F2F7] text-[#3C3C43] active:bg-[#E5E5EA]'
+                ? 'bg-primary text-white shadow-sm'
+                : 'bg-muted text-foreground/80 active:bg-border'
             }`}
           >
             <FileText className="w-4 h-4" />
@@ -67,8 +67,8 @@ export function AIAssistant() {
             onClick={() => setMobileTab('annotation')}
             className={`flex-1 min-w-[100px] px-4 py-2.5 rounded-xl text-sm font-medium transition-all flex items-center justify-center gap-2 whitespace-nowrap ${
               mobileTab === 'annotation'
-                ? 'bg-[#007AFF] text-white shadow-sm'
-                : 'bg-[#F2F2F7] text-[#3C3C43] active:bg-[#E5E5EA]'
+                ? 'bg-primary text-white shadow-sm'
+                : 'bg-muted text-foreground/80 active:bg-border'
             }`}
           >
             <Lightbulb className="w-4 h-4" />
@@ -78,8 +78,8 @@ export function AIAssistant() {
             onClick={() => setMobileTab('knowledge')}
             className={`flex-1 min-w-[100px] px-4 py-2.5 rounded-xl text-sm font-medium transition-all flex items-center justify-center gap-2 whitespace-nowrap ${
               mobileTab === 'knowledge'
-                ? 'bg-[#007AFF] text-white shadow-sm'
-                : 'bg-[#F2F2F7] text-[#3C3C43] active:bg-[#E5E5EA]'
+                ? 'bg-primary text-white shadow-sm'
+                : 'bg-muted text-foreground/80 active:bg-border'
             }`}
           >
             <BookOpen className="w-4 h-4" />
@@ -105,7 +105,7 @@ export function AIAssistant() {
             </div>
           )}
           {mobileTab === 'knowledge' && (
-            <div className="h-full overflow-y-auto bg-[#F2F2F7]">
+            <div className="h-full overflow-y-auto bg-muted">
               <LegalKnowledgeBase />
             </div>
           )}
@@ -133,20 +133,20 @@ export function AIAssistant() {
                 className="fixed inset-x-0 bottom-0 z-50 bg-white rounded-t-3xl shadow-2xl max-h-[70vh] flex flex-col"
               >
                 {/* Handle */}
-                <div className="flex items-center justify-center py-3 border-b border-[#E5E5EA]">
-                  <div className="w-10 h-1 bg-[#C7C7CC] rounded-full" />
+                <div className="flex items-center justify-center py-3 border-b border-border">
+                  <div className="w-10 h-1 bg-muted-foreground/30 rounded-full" />
                 </div>
 
                 {/* Header */}
-                <div className="px-4 py-3 border-b border-[#E5E5EA] flex items-center justify-between">
+                <div className="px-4 py-3 border-b border-border flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <div className={`w-2 h-2 rounded-full ${
-                      selectedAnnotation.type === 'error' ? 'bg-[#FF3B30]' :
-                      selectedAnnotation.type === 'warning' ? 'bg-[#FF9500]' :
-                      selectedAnnotation.type === 'suggestion' ? 'bg-[#007AFF]' :
-                      'bg-[#AF52DE]'
+                      selectedAnnotation.type === 'error' ? 'bg-destructive' :
+                      selectedAnnotation.type === 'warning' ? 'bg-warning' :
+                      selectedAnnotation.type === 'suggestion' ? 'bg-primary' :
+                      'bg-accent'
                     }`} />
-                    <h3 className="font-semibold text-[#1C1C1E]">
+                    <h3 className="font-semibold text-foreground">
                       {selectedAnnotation.type === 'error' ? '错误' :
                        selectedAnnotation.type === 'warning' ? '警告' :
                        selectedAnnotation.type === 'suggestion' ? '建议' :
@@ -155,32 +155,32 @@ export function AIAssistant() {
                   </div>
                   <button
                     onClick={() => setShowAnnotationSheet(false)}
-                    className="p-2 hover:bg-[#F2F2F7] rounded-lg transition-colors"
+                    className="p-2 hover:bg-muted rounded-lg transition-colors"
                   >
-                    <X className="w-5 h-5 text-[#8E8E93]" />
+                    <X className="w-5 h-5 text-muted-foreground" />
                   </button>
                 </div>
 
                 {/* Content */}
                 <div className="flex-1 overflow-y-auto p-4">
-                  <p className="text-[#1C1C1E] font-medium mb-2">
+                  <p className="text-foreground font-medium mb-2">
                     第 {selectedAnnotation.lineNumber} 行
                   </p>
-                  <p className="text-sm text-[#3C3C43] mb-4">
+                  <p className="text-sm text-foreground/80 mb-4">
                     {selectedAnnotation.message}
                   </p>
                   {selectedAnnotation.detail && (
-                    <div className="bg-[#F2F2F7] rounded-xl p-4 mb-3">
-                      <p className="text-xs font-medium text-[#8E8E93] mb-2">详细说明</p>
-                      <p className="text-sm text-[#3C3C43] leading-relaxed">
+                    <div className="bg-muted rounded-xl p-4 mb-3">
+                      <p className="text-xs font-medium text-muted-foreground mb-2">详细说明</p>
+                      <p className="text-sm text-foreground/80 leading-relaxed">
                         {selectedAnnotation.detail}
                       </p>
                     </div>
                   )}
                   {selectedAnnotation.reference && (
-                    <div className="bg-[#E5F3FF] border border-[#007AFF]/20 rounded-xl p-4">
-                      <p className="text-xs font-medium text-[#007AFF] mb-2">法律依据</p>
-                      <p className="text-sm text-[#1C1C1E]">
+                    <div className="bg-primary/10 border border-primary/20 rounded-xl p-4">
+                      <p className="text-xs font-medium text-primary mb-2">法律依据</p>
+                      <p className="text-sm text-foreground">
                         {selectedAnnotation.reference}
                       </p>
                     </div>
@@ -224,9 +224,9 @@ export function AIAssistant() {
           },
         }}
         handleClasses={{
-          right: 'hover:bg-[#007AFF] transition-colors',
+          right: 'hover:bg-primary transition-colors',
         }}
-        className="border-r border-[#E5E5EA] flex flex-col"
+        className="border-r border-border flex flex-col"
       >
         <DocumentEditor
           content={documentContent}
@@ -238,12 +238,12 @@ export function AIAssistant() {
       {/* Right: Annotation & Knowledge */}
       <div className="flex-1 flex flex-col">
         {/* Top: Progress Tracker */}
-        <div className="border-b border-[#E5E5EA]">
+        <div className="border-b border-border">
           <ProgressTracker />
         </div>
 
         {/* Middle: Annotation Panel */}
-        <div className="flex-1 overflow-y-auto border-b border-[#E5E5EA]">
+        <div className="flex-1 overflow-y-auto border-b border-border">
           <AnnotationPanel
             selectedAnnotation={selectedAnnotation}
             onClose={() => setSelectedAnnotation(null)}
@@ -251,7 +251,7 @@ export function AIAssistant() {
         </div>
 
         {/* Bottom: Knowledge Base */}
-        <div className="h-64 overflow-y-auto bg-[#F2F2F7]">
+        <div className="h-64 overflow-y-auto bg-muted">
           <LegalKnowledgeBase />
         </div>
       </div>

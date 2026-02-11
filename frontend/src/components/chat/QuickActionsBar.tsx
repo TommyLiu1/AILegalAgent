@@ -1,25 +1,25 @@
 /**
- * QuickActionsBar — 快捷操作工具栏 (v5)
+ * QuickActionsBar — 快捷操作工具栏 (v6 — 千问/豆包增强版)
  * 
  * 设计理念：
- * - 深度思考开关：独立导出为 DeepModeToggle 组件，由父组件放置到输入框内右侧
- * - 快捷操作按钮：
- *   - 点击后 **填充到输入框** 并聚焦，用户可补充需求后再发送
- *   - 点击后按钮高亮显示，用户发送/清空后自动取消高亮
- *   - 默认只显示一行（桌面 5 个，移动 3 个），多余收起到"更多"
- * - 按钮列表未来可从后端/设置动态加载（预留 actions prop）
+ * - 快捷操作标签：点击后 **填充到输入框** 并高亮选中态，用户补充需求后再发送
+ * - **NEW** 功能模式切换药丸：水平滚动药丸切换 AI 工作模式（参考千问/豆包）
+ * - 默认只显示一行（桌面 5 个 / 移动 3 个），其余收入"更多"
+ * - 标签列表未来可从后端/设置动态加载（技能扩展）
+ * - 深度思考开关独立导出为 DeepThinkToggle，由 Chat.tsx 放到输入框内部
  * - 处理中时淡出隐藏
  */
 
-import { useState, useCallback, memo } from 'react';
+import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Users, FileText, PenTool, Shield, MessageCircle, Search,
-  ChevronDown, ChevronUp, Briefcase, BookOpen, Brain,
+  ChevronDown, ChevronUp, Briefcase, BookOpen,
+  Brain, Zap,
 } from 'lucide-react';
 
-/** 功能模式（传给后端 context.mode） */
-export type QuickActionMode = 'chat' | 'deep_analysis' | 'contract' | 'document' | 'research';
+/** 功能模式（传给后端 Coordinator）：仅保留两种 — 普通对话 / 专业模式（深度分析） */
+export type QuickActionMode = 'chat' | 'deep_analysis';
 
 /** 快捷操作定义 */
 export interface QuickAction {
@@ -33,91 +33,45 @@ export interface QuickAction {
 /**
  * 默认快捷操作列表
  * 
- * 未来可通过 props.actions 从后端/设置页面动态注入
+ * 未来可从后端 API 或用户设置中动态加载，
+ * 实现 skills/agents 的前端业务扩展。
  */
 const DEFAULT_QUICK_ACTIONS: QuickAction[] = [
-  { id: 'qa-consult',    label: '法律咨询', icon: MessageCircle, query: '我有一个法律问题想咨询：' },
-  { id: 'qa-contract',   label: '合同审查', icon: FileText,      query: '请帮我审查以下合同：' },
+  { id: 'qa-consult',    label: '法律咨询', icon: MessageCircle, query: '我想咨询一个法律问题：' },
+  { id: 'qa-contract',   label: '合同审查', icon: FileText,      query: '请帮我审查这份合同：' },
   { id: 'qa-draft',      label: '文书起草', icon: PenTool,        query: '请帮我起草一份' },
-  { id: 'qa-risk',       label: '风险评估', icon: Shield,         query: '请帮我评估以下风险：' },
-  { id: 'qa-dd',         label: '尽职调查', icon: Search,         query: '请帮我调查以下企业的背景：' },
-  { id: 'qa-lawyer',     label: '找律师',   icon: Users,          query: '我想找一位擅长' },
-  { id: 'qa-regulation', label: '法规查询', icon: BookOpen,       query: '请帮我查询关于' },
-  { id: 'qa-case',       label: '案例检索', icon: Briefcase,      query: '请帮我检索与' },
+  { id: 'qa-risk',       label: '风险评估', icon: Shield,         query: '请帮我做风险评估：' },
+  { id: 'qa-dd',         label: '尽职调查', icon: Search,         query: '请帮我做尽职调查，目标公司：' },
+  { id: 'qa-labor',      label: '劳动人事', icon: Users,          query: '我有一个劳动人事问题：' },
+  { id: 'qa-regulation', label: '法规解读', icon: BookOpen,       query: '请帮我解读以下法规政策：' },
+  { id: 'qa-litigation', label: '诉讼策略', icon: Briefcase,      query: '请帮我分析诉讼策略：' },
 ];
 
-// ========== 深度思考开关（独立组件，由 Chat.tsx 放到输入框内） ==========
-
-interface DeepModeToggleProps {
-  isActive: boolean;
-  onToggle: () => void;
-  disabled?: boolean;
-}
-
-/**
- * 深度思考开关按钮 — 放在输入框内部（发送按钮左侧）
- * 
- * 紧凑设计：仅图标 + 圆点指示器，hover 显示 tooltip
- */
-export const DeepModeToggle = memo(function DeepModeToggle({
-  isActive,
-  onToggle,
-  disabled = false,
-}: DeepModeToggleProps) {
-  return (
-    <button
-      onClick={onToggle}
-      disabled={disabled}
-      title={isActive ? '关闭深度思考（多智能体协作·深度分析·联网搜索）' : '开启深度思考（多智能体协作·深度分析·联网搜索）'}
-      className={`relative flex items-center gap-1 px-2 py-1.5 text-xs font-medium rounded-lg transition-all duration-200 flex-shrink-0 disabled:opacity-40 ${
-        isActive
-          ? 'bg-purple-50 text-purple-600 hover:bg-purple-100'
-          : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'
-      }`}
-    >
-      <Brain className="w-4 h-4" />
-      {/* 激活指示圆点 */}
-      {isActive && (
-        <motion.span
-          initial={{ scale: 0 }}
-          animate={{ scale: 1 }}
-          className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-purple-500 ring-2 ring-white"
-        />
-      )}
-    </button>
-  );
-});
-
-// ========== 快捷操作工具栏 ==========
+// ========== 快捷操作标签栏 ==========
 
 interface QuickActionsBarProps {
-  /** 用户点击快捷操作后：填充文本到输入框（不直接发送），同时传回 actionId 用于高亮 */
-  onFillInput: (text: string, actionId?: string) => void;
+  /** 用户点击快捷操作后：填充文本到输入框（不直接发送） */
+  onFillInput: (text: string) => void;
   isProcessing: boolean;
   isMobile: boolean;
-  /** 当前选中的快捷操作 ID（用于高亮显示） */
-  activeActionId?: string | null;
-  /** 外部传入的动态操作列表（未来从后端/设置加载），不传则使用默认 */
+  /** 可选：外部传入的操作列表（支持动态扩展） */
   actions?: QuickAction[];
+  /** 当前选中的标签 ID（用于高亮） */
+  activeActionId?: string | null;
 }
 
 export function QuickActionsBar({
   onFillInput,
   isProcessing,
   isMobile,
-  activeActionId = null,
   actions,
+  activeActionId,
 }: QuickActionsBarProps) {
   const [expanded, setExpanded] = useState(false);
 
   const quickActions = actions || DEFAULT_QUICK_ACTIONS;
 
-  const handleQuickAction = useCallback((action: QuickAction) => {
-    // 填充到输入框 + 传回 actionId 供父组件高亮
-    onFillInput(action.query, action.id);
-  }, [onFillInput]);
-
-  // 默认显示数量：桌面 5 个（一行刚好），移动 3 个
+  // 默认显示数量：桌面端一行放 5 个，移动端 3 个
   const defaultVisibleCount = isMobile ? 3 : 5;
   const visibleActions = expanded ? quickActions : quickActions.slice(0, defaultVisibleCount);
   const hasMore = quickActions.length > defaultVisibleCount;
@@ -132,33 +86,29 @@ export function QuickActionsBar({
           transition={{ duration: 0.2 }}
           className="overflow-hidden"
         >
-          {/* 快捷操作按钮 — 点击填充输入框 + 选中高亮 */}
           <div className="flex flex-wrap items-center gap-1.5 mb-2">
-            <AnimatePresence mode="popLayout">
-              {visibleActions.map((action) => {
-                const Icon = action.icon;
-                const isSelected = activeActionId === action.id;
-                return (
-                  <motion.button
-                    key={action.id}
-                    layout
-                    initial={{ opacity: 0, scale: 0.9 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.9 }}
-                    transition={{ duration: 0.15 }}
-                    onClick={() => handleQuickAction(action)}
-                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-full transition-all active:scale-95 shadow-sm border ${
-                      isSelected
-                        ? 'bg-blue-50 text-blue-600 border-blue-300 ring-1 ring-blue-200'
-                        : 'text-gray-600 bg-white border-gray-200 hover:border-blue-300 hover:text-blue-600 hover:bg-blue-50'
-                    }`}
-                  >
-                    <Icon className={`w-3.5 h-3.5 ${isSelected ? 'text-blue-500' : ''}`} />
-                    <span>{action.label}</span>
-                  </motion.button>
-                );
-              })}
-            </AnimatePresence>
+            {visibleActions.map((action) => {
+              const Icon = action.icon;
+              const isActive = activeActionId === action.id;
+              return (
+                <motion.button
+                  key={action.id}
+                  layout
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.9 }}
+                  onClick={() => onFillInput(action.query)}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-full transition-all active:scale-95 shadow-sm border ${
+                    isActive
+                      ? 'bg-blue-50 text-blue-600 border-blue-300 ring-1 ring-blue-200'
+                      : 'text-gray-600 bg-white border-gray-200 hover:border-blue-300 hover:text-blue-600 hover:bg-blue-50'
+                  }`}
+                >
+                  <Icon className="w-3.5 h-3.5" />
+                  <span>{action.label}</span>
+                </motion.button>
+              );
+            })}
             {hasMore && (
               <button
                 onClick={() => setExpanded(!expanded)}
@@ -175,5 +125,45 @@ export function QuickActionsBar({
         </motion.div>
       )}
     </AnimatePresence>
+  );
+}
+
+// ========== 深度思考/专业模式开关（整合原药丸为两种模式：普通 | 专业，由 Chat 放入输入框内） ==========
+
+interface DeepThinkToggleProps {
+  isActive: boolean;
+  onToggle: () => void;
+  disabled?: boolean;
+}
+
+/**
+ * 深度思考开关按钮
+ * 
+ * 设计为嵌入输入框内部右侧使用，发送按钮左侧。
+ * 紧凑的胶囊形态，激活时紫色高亮。
+ */
+export function DeepThinkToggle({ isActive, onToggle, disabled }: DeepThinkToggleProps) {
+  return (
+    <button
+      onClick={onToggle}
+      disabled={disabled}
+      title={isActive ? '关闭深度思考' : '开启深度思考：多智能体协作 · 深度分析 · 联网搜索'}
+      className={`inline-flex items-center gap-1 px-2 py-1 text-[11px] font-medium rounded-lg transition-all duration-200 flex-shrink-0 whitespace-nowrap disabled:opacity-40 ${
+        isActive
+          ? 'bg-purple-100 text-purple-600 hover:bg-purple-150'
+          : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'
+      }`}
+    >
+      {isActive ? (
+        <Brain className="w-3.5 h-3.5" />
+      ) : (
+        <Zap className="w-3.5 h-3.5" />
+      )}
+      <span className="hidden sm:inline">深度思考</span>
+      {/* 开关指示圆点 */}
+      <span className={`inline-block w-1.5 h-1.5 rounded-full transition-colors ${
+        isActive ? 'bg-purple-500' : 'bg-gray-300'
+      }`} />
+    </button>
   );
 }

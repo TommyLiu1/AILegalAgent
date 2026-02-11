@@ -82,7 +82,8 @@ class ComplianceAgent(BaseLegalAgent):
     async def process(self, task: Dict[str, Any]) -> AgentResponse:
         """处理合规审核任务"""
         description = task.get("description", "")
-        context = task.get("context", {})
+        context = task.get("context") or {}
+        llm_config = context.get("llm_config") or task.get("llm_config")
         compliance_area = context.get("area", "")
         
         # 构建审核提示
@@ -103,18 +104,35 @@ class ComplianceAgent(BaseLegalAgent):
 请详细分析并给出专业意见。
 """
         
-        # 调用Agent
-        response = await self.chat(prompt)
+        # Inject dependency results
+        dep_results = task.get("dependent_results", {})
+        if dep_results:
+            dep_context = "\n\n--- 前序分析结果 ---\n"
+            for dep_id, dep_res in dep_results.items():
+                if hasattr(dep_res, 'content'):
+                    dep_context += f"\n{dep_res.agent_name}:\n{dep_res.content[:1500]}\n"
+                elif isinstance(dep_res, dict):
+                    dep_context += f"\n{dep_res.get('agent_name', dep_id)}:\n{str(dep_res.get('content', ''))[:1500]}\n"
+            prompt += dep_context
         
-        return AgentResponse(
-            agent_name=self.name,
-            content=response,
-            reasoning="基于现行法律法规和合规管理最佳实践",
-            citations=[],
-            actions=[
-                {"type": "compliance_review", "description": "合规审核完成"}
-            ]
-        )
+        try:
+            response = await self.chat(prompt, llm_config=llm_config)
+            
+            return AgentResponse(
+                agent_name=self.name,
+                content=response,
+                reasoning="基于现行法律法规和合规管理最佳实践",
+                citations=[],
+                actions=[
+                    {"type": "compliance_review", "description": "合规审核完成"}
+                ]
+            )
+        except Exception as e:
+            return AgentResponse(
+                agent_name=self.name,
+                content=f"处理失败: {str(e)[:200]}",
+                metadata={"error": True}
+            )
     
     async def check_compliance(
         self,

@@ -15,13 +15,16 @@ from sqlalchemy.ext.asyncio import (
     async_sessionmaker,
     create_async_engine,
 )
-from sqlalchemy.pool import NullPool
+from sqlalchemy.pool import NullPool, StaticPool
 from httpx import AsyncClient, ASGITransport
 
+# 导入所有模型确保 Base.metadata 包含全部表定义
+import src.models  # noqa: F401 — 触发 __init__.py 中的全量导入
 from src.models.base import Base
 from src.models.user import User, Organization
 from src.models.case import Case, CaseStatus, CasePriority, CaseType
 from src.models.document import Document
+from src.models.conversation import Conversation, Message
 from src.models.sentiment import SentimentRecord, SentimentAlert, SentimentMonitor
 from src.models.collaboration import DocumentSession, DocumentCollaborator
 
@@ -41,10 +44,20 @@ if TEST_DATABASE_URL.startswith("postgresql://"):
     TEST_DATABASE_URL = TEST_DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://")
 
 # 创建测试引擎
+# 对于 SQLite 内存数据库，必须使用 StaticPool 来共享同一个连接
+# 否则不同连接会创建独立的空数据库
+_engine_kwargs = {
+    "echo": False,
+}
+if "sqlite" in TEST_DATABASE_URL:
+    _engine_kwargs["poolclass"] = StaticPool
+    _engine_kwargs["connect_args"] = {"check_same_thread": False}
+else:
+    _engine_kwargs["poolclass"] = NullPool
+
 test_engine = create_async_engine(
     TEST_DATABASE_URL,
-    echo=False,
-    poolclass=NullPool,
+    **_engine_kwargs,
 )
 
 # 创建测试会话工厂
@@ -115,10 +128,41 @@ async def db(db_session: AsyncSession) -> AsyncSession:
 async def client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
     """
     创建测试HTTP客户端
+
+    自动确保 DEV_MODE 所需的 admin@example.com 用户存在，
+    以避免所有需要认证的端点返回 401。
     """
+    from sqlalchemy import select
     from src.api.main import app
     from src.core.database import get_db
-    
+
+    # 确保 admin@example.com 存在（DEV_MODE 认证依赖此用户）
+    result = await db_session.execute(
+        select(User).where(User.email == "admin@example.com")
+    )
+    if result.scalar_one_or_none() is None:
+        # 尝试复用已有组织，否则新建
+        org_result = await db_session.execute(
+            select(Organization).limit(1)
+        )
+        org = org_result.scalar_one_or_none()
+        if org is None:
+            org = Organization(id=str(uuid4()), name="Auto Admin Org")
+            db_session.add(org)
+            await db_session.flush()
+
+        admin_user = User(
+            id=str(uuid4()),
+            email="admin@example.com",
+            name="Auto Admin",
+            hashed_password="hashed_password",
+            org_id=org.id,
+            is_active=True,
+            role="admin",
+        )
+        db_session.add(admin_user)
+        await db_session.flush()
+
     # 覆盖数据库依赖
     async def override_get_db():
         yield db_session

@@ -146,12 +146,12 @@ export function DueDiligence() {
         {!hasResults && !isSearching && (
           <div className="flex items-center justify-center py-16 lg:py-20">
             <div className="text-center space-y-4">
-              <div className="w-16 h-16 lg:w-20 lg:h-20 mx-auto bg-[#F2F2F7] rounded-full flex items-center justify-center">
-                <Search className="w-8 h-8 lg:w-10 lg:h-10 text-[#8E8E93]" />
+              <div className="w-16 h-16 lg:w-20 lg:h-20 mx-auto bg-muted rounded-full flex items-center justify-center">
+                <Search className="w-8 h-8 lg:w-10 lg:h-10 text-muted-foreground" />
               </div>
               <div>
-                <h3 className="font-medium text-[#1C1C1E] mb-2 text-base lg:text-lg">尽职调查</h3>
-                <p className="text-sm text-[#8E8E93]">
+                <h3 className="font-medium text-foreground mb-2 text-base lg:text-lg">尽职调查</h3>
+                <p className="text-sm text-muted-foreground">
                   输入企业名称，AI 将自动进行全方位调查
                 </p>
               </div>
@@ -160,7 +160,7 @@ export function DueDiligence() {
                   <button
                     key={name}
                     onClick={() => handleSearch(name)}
-                    className="px-3 py-1.5 bg-[#F2F2F7] text-[#3C3C43] rounded-full text-sm hover:bg-[#E5E5EA] transition-colors"
+                    className="px-3 py-1.5 bg-muted text-foreground/80 rounded-full text-sm hover:bg-border transition-colors"
                   >
                     {name}
                   </button>
@@ -174,13 +174,13 @@ export function DueDiligence() {
           <div className="flex items-center justify-center py-8 lg:py-12">
             <div className="w-full max-w-md">
               <div className="text-center mb-6">
-                <div className="w-16 h-16 mx-auto bg-[#E5F3FF] rounded-full flex items-center justify-center mb-4">
-                  <Building2 className="w-8 h-8 text-[#007AFF] animate-pulse" />
+                <div className="w-16 h-16 mx-auto bg-primary/10 rounded-full flex items-center justify-center mb-4">
+                  <Building2 className="w-8 h-8 text-primary animate-pulse" />
                 </div>
-                <h3 className="font-medium text-[#1C1C1E] text-lg">正在调查: {companyName}</h3>
+                <h3 className="font-medium text-foreground text-lg">正在调查: {companyName}</h3>
               </div>
               
-              <div className="bg-white rounded-2xl p-6 shadow-sm space-y-4">
+                <div className="bg-card rounded-2xl p-6 shadow-sm space-y-4">
                 <CrawlProgressBar taskId={licTaskId} />
                 
                 {steps.map((step, index) => (
@@ -192,28 +192,28 @@ export function DueDiligence() {
                     className="flex items-center gap-4"
                   >
                     <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                      step.status === 'done' ? 'bg-green-100' :
-                      step.status === 'loading' ? 'bg-blue-100' :
-                      'bg-[#F2F2F7]'
+                      step.status === 'done' ? 'bg-success/10' :
+                      step.status === 'loading' ? 'bg-primary/10' :
+                      'bg-muted'
                     }`}>
                       {step.status === 'loading' ? (
-                        <Loader2 className="w-5 h-5 text-[#007AFF] animate-spin" />
+                        <Loader2 className="w-5 h-5 text-primary animate-spin" />
                       ) : step.status === 'done' ? (
-                        <CheckCircle className="w-5 h-5 text-green-500" />
+                        <CheckCircle className="w-5 h-5 text-success" />
                       ) : (
-                        <span className="w-2 h-2 bg-[#8E8E93] rounded-full" />
+                        <span className="w-2 h-2 bg-muted-foreground rounded-full" />
                       )}
                     </div>
                     <div className="flex-1">
                       <p className={`font-medium ${
-                        step.status === 'done' ? 'text-green-600' :
-                        step.status === 'loading' ? 'text-[#007AFF]' :
-                        'text-[#8E8E93]'
+                        step.status === 'done' ? 'text-success' :
+                        step.status === 'loading' ? 'text-primary' :
+                        'text-muted-foreground'
                       }`}>
                         {step.label}
                       </p>
                       {step.status === 'loading' && (
-                        <p className="text-xs text-[#8E8E93]">正在获取数据...</p>
+                        <p className="text-xs text-muted-foreground">正在获取数据...</p>
                       )}
                     </div>
                   </motion.div>

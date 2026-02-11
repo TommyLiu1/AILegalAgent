@@ -66,29 +66,29 @@ export function WelcomeGuide({ onClose, onSelectView }: WelcomeGuideProps) {
       <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
-        className="relative bg-white rounded-3xl shadow-2xl max-w-6xl w-full max-h-[90vh] overflow-hidden"
+        className="relative bg-card rounded-3xl shadow-2xl max-w-6xl w-full max-h-[90vh] overflow-hidden"
       >
         {/* Close button */}
         <button
           onClick={onClose}
-          className="absolute top-6 right-6 z-10 p-2 hover:bg-[#F2F2F7] rounded-full transition-colors"
+          className="absolute top-6 right-6 z-10 p-2 hover:bg-muted rounded-full transition-colors"
         >
-          <X className="w-5 h-5 text-[#8E8E93]" />
+          <X className="w-5 h-5 text-muted-foreground" />
         </button>
 
         {/* Header */}
-        <div className="bg-white px-8 py-6 border-b border-[#E5E5EA] flex items-center gap-4">
+        <div className="bg-card px-8 py-6 border-b border-border flex items-center gap-4">
           <motion.div
             initial={{ scale: 0 }}
             animate={{ scale: 1 }}
             transition={{ delay: 0.1, type: 'spring', stiffness: 200 }}
-            className="w-14 h-14 bg-[#007AFF] rounded-2xl flex items-center justify-center shadow-lg flex-shrink-0"
+            className="w-14 h-14 bg-primary rounded-2xl flex items-center justify-center shadow-lg flex-shrink-0"
           >
             <Sparkles className="w-7 h-7 text-white" />
           </motion.div>
           <div className="flex-1 text-left">
-            <h1 className="text-2xl font-semibold text-[#1C1C1E] tracking-tight">欢迎使用 AI 法务协同系统</h1>
-            <p className="text-[#8E8E93] text-sm mt-0.5">Agent-Native 智能法律服务平台</p>
+            <h1 className="text-2xl font-semibold text-foreground tracking-tight">欢迎使用 AI 法务协同系统</h1>
+            <p className="text-muted-foreground text-sm mt-0.5">Agent-Native 智能法律服务平台</p>
           </div>
         </div>
 
@@ -98,12 +98,12 @@ export function WelcomeGuide({ onClose, onSelectView }: WelcomeGuideProps) {
             {features.map((feature, index) => {
               const Icon = feature.icon;
               const bgColors = {
-                chat: 'bg-[#007AFF]',
-                cases: 'bg-[#AF52DE]',
-                documents: 'bg-[#34C759]',
-                dashboard: 'bg-[#FF9500]',
-                'due-diligence': 'bg-[#FF2D55]',
-                'ai-assistant': 'bg-[#5AC8FA]',
+                chat: 'bg-primary',
+                cases: 'bg-accent',
+                documents: 'bg-success',
+                dashboard: 'bg-warning',
+                'due-diligence': 'bg-destructive',
+                'ai-assistant': 'bg-info',
               };
               
               return (
@@ -116,37 +116,37 @@ export function WelcomeGuide({ onClose, onSelectView }: WelcomeGuideProps) {
                     onSelectView(feature.id);
                     onClose();
                   }}
-                  className="group bg-white border border-[#E5E5EA] rounded-2xl p-4 lg:p-5 hover:border-[#C7C7CC] hover:shadow-lg transition-all text-left active:scale-98"
+                  className="group bg-card border border-border rounded-2xl p-4 lg:p-5 hover:border-muted-foreground/30 hover:shadow-lg transition-all text-left active:scale-98"
                 >
                   <div className={`w-10 h-10 lg:w-12 lg:h-12 ${bgColors[feature.id as keyof typeof bgColors]} rounded-xl lg:rounded-2xl flex items-center justify-center mb-3 lg:mb-4 shadow-sm`}>
                     <Icon className="w-5 h-5 lg:w-6 lg:h-6 text-white" />
                   </div>
-                  <h3 className="font-semibold text-[#1C1C1E] mb-1 lg:mb-1.5 text-sm lg:text-base">
+                  <h3 className="font-semibold text-foreground mb-1 lg:mb-1.5 text-sm lg:text-base">
                     {feature.title}
                   </h3>
-                  <p className="text-xs lg:text-sm text-[#8E8E93] mb-3 lg:mb-4 leading-relaxed line-clamp-2">
+                  <p className="text-xs lg:text-sm text-muted-foreground mb-3 lg:mb-4 leading-relaxed line-clamp-2">
                     {feature.description}
                   </p>
                   <div className="space-y-1 lg:space-y-1.5">
                     {feature.highlights.map((highlight) => (
-                      <div key={highlight} className="flex items-center gap-2 text-xs text-[#8E8E93]">
-                        <div className="w-1 h-1 lg:w-1.5 lg:h-1.5 rounded-full bg-[#C7C7CC] flex-shrink-0"></div>
+                      <div key={highlight} className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <div className="w-1 h-1 lg:w-1.5 lg:h-1.5 rounded-full bg-muted-foreground/30 flex-shrink-0"></div>
                         <span className="truncate">{highlight}</span>
                       </div>
                     ))}
                   </div>
-                  <ArrowRight className="absolute bottom-4 lg:bottom-5 right-4 lg:right-5 w-4 h-4 lg:w-5 lg:h-5 text-[#C7C7CC] opacity-0 group-hover:opacity-100 transform translate-x-2 group-hover:translate-x-0 transition-all" />
+                  <ArrowRight className="absolute bottom-4 lg:bottom-5 right-4 lg:right-5 w-4 h-4 lg:w-5 lg:h-5 text-muted-foreground/30 opacity-0 group-hover:opacity-100 transform translate-x-2 group-hover:translate-x-0 transition-all" />
                 </motion.button>
               );
             })}
           </div>
 
           {/* Quick Start */}
-          <div className="bg-[#F2F2F7] rounded-2xl p-4 lg:p-5">
+          <div className="bg-muted rounded-2xl p-4 lg:p-5">
             <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-3">
               <div>
-                <h3 className="font-semibold text-[#1C1C1E] mb-1 lg:mb-1.5 text-sm lg:text-base">快速开始</h3>
-                <p className="text-xs lg:text-sm text-[#8E8E93]">
+                <h3 className="font-semibold text-foreground mb-1 lg:mb-1.5 text-sm lg:text-base">快速开始</h3>
+                <p className="text-xs lg:text-sm text-muted-foreground">
                   选择任意功能模块开始体验 AI 法务协同系统
                 </p>
               </div>
@@ -155,7 +155,7 @@ export function WelcomeGuide({ onClose, onSelectView }: WelcomeGuideProps) {
                   onSelectView('chat');
                   onClose();
                 }}
-                className="w-full lg:w-auto px-5 lg:px-6 py-2.5 lg:py-3 bg-[#007AFF] text-white rounded-xl hover:bg-[#0051D5] active:scale-95 transition-all flex items-center justify-center gap-2 font-medium shadow-sm text-sm"
+                className="w-full lg:w-auto px-5 lg:px-6 py-2.5 lg:py-3 bg-primary text-white rounded-xl hover:bg-primary/90 active:scale-95 transition-all flex items-center justify-center gap-2 font-medium shadow-sm text-sm"
               >
                 开始使用
                 <ArrowRight className="w-4 h-4 lg:w-5 lg:h-5" />

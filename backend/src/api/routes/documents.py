@@ -1,5 +1,6 @@
 """文档管理路由"""
 
+import uuid as _uuid
 from datetime import datetime
 from typing import Optional, List, Dict, Any
 from fastapi import APIRouter, HTTPException, Query, Depends, UploadFile, File, Form, Body
@@ -14,6 +15,15 @@ from src.services.document_service import DocumentService
 from src.models.user import User
 
 router = APIRouter()
+
+
+def _validate_uuid(value: str, field_name: str = "ID") -> str:
+    """校验 UUID 格式，非法格式返回 404 而非 500"""
+    try:
+        _uuid.UUID(value)
+        return value
+    except (ValueError, AttributeError):
+        raise HTTPException(status_code=404, detail=f"无效的{field_name}格式")
 
 
 class DocumentResponse(BaseModel):
@@ -273,6 +283,7 @@ async def generate_document(
 @router.get("/{document_id}", response_model=UnifiedResponse)
 async def get_document(document_id: str, db: AsyncSession = Depends(get_db)):
     """获取文档详情"""
+    _validate_uuid(document_id, "文档ID")
     service = DocumentService(db)
     document = await service.get_document(document_id)
     
@@ -303,6 +314,7 @@ async def update_document(
     db: AsyncSession = Depends(get_db),
 ):
     """更新文档元数据"""
+    _validate_uuid(document_id, "文档ID")
     service = DocumentService(db)
     
     document = await service.update_document(
@@ -340,6 +352,7 @@ async def update_document_content(
     user: Optional[User] = Depends(get_current_user),
 ):
     """更新文档内容（创建新版本）"""
+    _validate_uuid(document_id, "文档ID")
     service = DocumentService(db)
     
     document = await service.update_document_content(
@@ -372,6 +385,7 @@ async def update_document_content(
 @router.delete("/{document_id}", response_model=UnifiedResponse)
 async def delete_document(document_id: str, db: AsyncSession = Depends(get_db)):
     """删除文档"""
+    _validate_uuid(document_id, "文档ID")
     service = DocumentService(db)
     success = await service.delete_document(document_id)
     
@@ -384,6 +398,7 @@ async def delete_document(document_id: str, db: AsyncSession = Depends(get_db)):
 @router.get("/{document_id}/versions", response_model=UnifiedResponse)
 async def get_document_versions(document_id: str, db: AsyncSession = Depends(get_db)):
     """获取文档版本历史"""
+    _validate_uuid(document_id, "文档ID")
     service = DocumentService(db)
     versions = await service.get_versions(document_id)
     

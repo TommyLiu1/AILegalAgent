@@ -30,7 +30,7 @@ export function LawyerWorkload() {
 
   if (loading) {
     return (
-      <div className="bg-white rounded-2xl border border-[#E5E5EA] p-6 h-[300px] flex items-center justify-center">
+      <div className="bg-white rounded-2xl border border-border p-6 h-[300px] flex items-center justify-center">
         <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
       </div>
     );
@@ -41,11 +41,11 @@ export function LawyerWorkload() {
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 0.15 }}
-      className="bg-white rounded-2xl border border-[#E5E5EA] p-6"
+      className="bg-white rounded-2xl border border-border p-6"
     >
       <div className="mb-6">
-        <h3 className="font-semibold text-[#1C1C1E]">律师工作负载</h3>
-        <p className="text-sm text-[#8E8E93] mt-1">实时监控团队成员工作状态</p>
+        <h3 className="font-semibold text-foreground">律师工作负载</h3>
+        <p className="text-sm text-muted-foreground mt-1">实时监控团队成员工作状态</p>
       </div>
 
       <div className="space-y-4">
@@ -62,28 +62,28 @@ export function LawyerWorkload() {
                 initial={{ opacity: 0, x: -20 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: index * 0.05 }}
-                className="border border-[#E5E5EA] rounded-xl p-4 hover:border-[#C7C7CC] transition-colors"
+                className="border border-border rounded-xl p-4 hover:border-muted-foreground/30 transition-colors"
               >
                 <div className="flex items-center gap-3 mb-3">
-                  <div className="w-10 h-10 bg-[#F2F2F7] rounded-full flex items-center justify-center text-lg">
-                    <User className="w-5 h-5 text-gray-500" />
+                  <div className="w-10 h-10 bg-muted rounded-full flex items-center justify-center text-lg">
+                    <User className="w-5 h-5 text-muted-foreground" />
                   </div>
                   <div className="flex-1">
                     <div className="flex items-center justify-between">
-                      <h4 className="font-medium text-[#1C1C1E]">{lawyer.name}</h4>
-                      <span className="text-sm text-[#8E8E93]">
+                      <h4 className="font-medium text-foreground">{lawyer.name}</h4>
+                      <span className="text-sm text-muted-foreground">
                         {lawyer.count} 案件
                       </span>
                     </div>
                     <div className="flex items-center gap-3 mt-1">
                       <div className="flex-1">
-                        <div className="h-2 bg-[#F2F2F7] rounded-full overflow-hidden">
+                        <div className="h-2 bg-muted rounded-full overflow-hidden">
                           <motion.div
                             initial={{ width: 0 }}
                             animate={{ width: `${workloadPercent}%` }}
                             transition={{ duration: 1, delay: index * 0.05 }}
                             className={`h-full rounded-full ${
-                              isOverloaded ? 'bg-[#FF3B30]' : 'bg-[#34C759]'
+                              isOverloaded ? 'bg-destructive' : 'bg-success'
                             }`}
                           />
                         </div>
@@ -93,8 +93,8 @@ export function LawyerWorkload() {
                 </div>
 
                 {isOverloaded && (
-                  <div className="mt-2 px-3 py-1.5 bg-[#FFF8ED] border border-[#FF9500] rounded-lg">
-                    <p className="text-xs text-[#FF9500]">
+                  <div className="mt-2 px-3 py-1.5 bg-warning-light border border-warning rounded-lg">
+                    <p className="text-xs text-warning">
                       ⚠️ 工作负载较高，建议重新分配任务
                     </p>
                   </div>
@@ -103,7 +103,7 @@ export function LawyerWorkload() {
             );
           })
         ) : (
-          <div className="text-center py-8 text-gray-400 text-sm">暂无数据</div>
+          <div className="text-center py-8 text-muted-foreground/50 text-sm">暂无数据</div>
         )}
       </div>
     </motion.div>

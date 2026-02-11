@@ -31,15 +31,15 @@ export function RealtimeAlerts() {
   };
 
   const typeStyles = {
-    urgent: 'bg-[#FFF1F0] border-[#FF3B30] text-[#FF3B30]',
-    warning: 'bg-[#FFF8ED] border-[#FF9500] text-[#FF9500]',
-    info: 'bg-[#E5F3FF] border-[#007AFF] text-[#007AFF]',
+    urgent: 'bg-destructive/10 border-destructive text-destructive',
+    warning: 'bg-warning-light border-warning text-warning',
+    info: 'bg-primary/10 border-primary text-primary',
   };
 
   const iconBgStyles = {
-    urgent: 'bg-[#FF3B30]/10 text-[#FF3B30]',
-    warning: 'bg-[#FF9500]/10 text-[#FF9500]',
-    info: 'bg-[#007AFF]/10 text-[#007AFF]',
+    urgent: 'bg-destructive/10 text-destructive',
+    warning: 'bg-warning/10 text-warning',
+    info: 'bg-primary/10 text-primary',
   };
 
   const getIcon = (type: string) => {
@@ -52,7 +52,7 @@ export function RealtimeAlerts() {
 
   if (loading) {
     return (
-      <div className="bg-white rounded-2xl border border-[#E5E5EA] p-6 h-[200px] flex items-center justify-center">
+      <div className="bg-white rounded-2xl border border-border p-6 h-[200px] flex items-center justify-center">
         <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
       </div>
     );
@@ -63,18 +63,18 @@ export function RealtimeAlerts() {
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
       transition={{ delay: 0.3 }}
-      className="bg-white rounded-2xl border border-[#E5E5EA] p-6"
+      className="bg-white rounded-2xl border border-border p-6"
     >
       <div className="flex items-center gap-2 mb-4">
-        <div className="w-8 h-8 bg-[#FF3B30]/10 rounded-xl flex items-center justify-center relative">
-          <Bell className="w-4 h-4 text-[#FF3B30]" />
+        <div className="w-8 h-8 bg-destructive/10 rounded-xl flex items-center justify-center relative">
+          <Bell className="w-4 h-4 text-destructive" />
           {alerts.length > 0 && (
-            <div className="absolute -top-1 -right-1 w-3 h-3 bg-[#FF3B30] rounded-full border-2 border-white"></div>
+            <div className="absolute -top-1 -right-1 w-3 h-3 bg-destructive rounded-full border-2 border-white"></div>
           )}
         </div>
         <div>
-          <h3 className="font-semibold text-[#1C1C1E]">实时预警</h3>
-          <p className="text-xs text-[#8E8E93]">{alerts.length} 条待处理</p>
+          <h3 className="font-semibold text-foreground">实时预警</h3>
+          <p className="text-xs text-muted-foreground">{alerts.length} 条待处理</p>
         </div>
       </div>
 
@@ -104,11 +104,11 @@ export function RealtimeAlerts() {
             );
           })
         ) : (
-          <div className="text-center py-4 text-gray-400 text-xs">暂无预警信息</div>
+          <div className="text-center py-4 text-muted-foreground/50 text-xs">暂无预警信息</div>
         )}
       </div>
 
-      <button className="w-full mt-4 py-2 text-sm text-[#007AFF] hover:text-[#0051D5] font-medium transition-colors active:opacity-70">
+      <button className="w-full mt-4 py-2 text-sm text-primary hover:text-primary/90 font-medium transition-colors active:opacity-70">
         查看全部预警 →
       </button>
     </motion.div>

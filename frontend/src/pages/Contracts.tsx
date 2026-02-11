@@ -14,7 +14,7 @@ import { toast } from 'sonner'
 import { contractsApi, Contract, ContractCreate } from '@/lib/api'
 
 const STATUS_MAP: Record<string, { label: string; color: string }> = {
-  draft: { label: '草稿', color: 'bg-gray-100 text-gray-700' },
+  draft: { label: '草稿', color: 'bg-muted text-foreground' },
   pending_review: { label: '待审核', color: 'bg-yellow-100 text-yellow-700' },
   under_review: { label: '审核中', color: 'bg-blue-100 text-blue-700' },
   approved: { label: '已批准', color: 'bg-green-100 text-green-700' },
@@ -100,7 +100,7 @@ export default function Contracts() {
 
       {/* 统计卡片 */}
       <div className="grid gap-4 md:grid-cols-4">
-        <div className="rounded-lg border bg-card p-4">
+        <div className="rounded-xl border bg-card p-4">
           <div className="flex items-center justify-between">
             <p className="text-sm text-muted-foreground">待审核</p>
             <Clock className="h-5 w-5 text-yellow-500" />
@@ -109,7 +109,7 @@ export default function Contracts() {
             {contracts.filter(c => c.status === 'pending_review').length}
           </p>
         </div>
-        <div className="rounded-lg border bg-card p-4">
+        <div className="rounded-xl border bg-card p-4">
           <div className="flex items-center justify-between">
             <p className="text-sm text-muted-foreground">审核中</p>
             <Loader2 className="h-5 w-5 text-blue-500" />
@@ -118,7 +118,7 @@ export default function Contracts() {
             {contracts.filter(c => c.status === 'under_review').length}
           </p>
         </div>
-        <div className="rounded-lg border bg-card p-4">
+        <div className="rounded-xl border bg-card p-4">
           <div className="flex items-center justify-between">
             <p className="text-sm text-muted-foreground">高风险</p>
             <AlertTriangle className="h-5 w-5 text-red-500" />
@@ -127,7 +127,7 @@ export default function Contracts() {
             {contracts.filter(c => c.risk_level === 'high' || c.risk_level === 'critical').length}
           </p>
         </div>
-        <div className="rounded-lg border bg-card p-4">
+        <div className="rounded-xl border bg-card p-4">
           <div className="flex items-center justify-between">
             <p className="text-sm text-muted-foreground">已完成</p>
             <CheckCircle className="h-5 w-5 text-green-500" />
@@ -139,7 +139,7 @@ export default function Contracts() {
       </div>
 
       {/* 合同列表 */}
-      <div className="rounded-lg border bg-card">
+      <div className="rounded-xl border bg-card">
         {loading ? (
           <div className="flex items-center justify-center py-12">
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -201,7 +201,7 @@ export default function Contracts() {
                       
                       <button
                         onClick={() => handleReview(contract)}
-                        className="p-2 rounded hover:bg-muted"
+                        className="p-2 rounded-lg hover:bg-muted text-muted-foreground"
                       >
                         <Eye className="h-4 w-4" />
                       </button>
@@ -299,8 +299,8 @@ function ReviewModal({
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-background rounded-lg shadow-lg w-full max-w-4xl mx-4 max-h-[90vh] overflow-hidden flex flex-col">
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
+      <div className="bg-background rounded-xl shadow-lg w-full max-w-4xl mx-4 max-h-[90vh] overflow-hidden flex flex-col">
         <div className="p-6 border-b">
           <h2 className="text-lg font-semibold">合同智能审查</h2>
         </div>
@@ -310,7 +310,7 @@ function ReviewModal({
             <div className="space-y-6">
               {/* 审查结果概览 */}
               <div className="grid grid-cols-3 gap-4">
-                <div className="rounded-lg border p-4">
+                <div className="rounded-xl border p-4">
                   <p className="text-sm text-muted-foreground">风险等级</p>
                   <p className={`text-lg font-bold ${
                     result.risk_level === 'critical' || result.risk_level === 'high' ? 'text-red-600' :
@@ -319,18 +319,18 @@ function ReviewModal({
                     {RISK_LEVEL_MAP[result.risk_level]?.label || result.risk_level}
                   </p>
                 </div>
-                <div className="rounded-lg border p-4">
+                <div className="rounded-xl border p-4">
                   <p className="text-sm text-muted-foreground">风险评分</p>
                   <p className="text-lg font-bold">{((result.risk_score || 0) * 100).toFixed(0)}%</p>
                 </div>
-                <div className="rounded-lg border p-4">
+                <div className="rounded-xl border p-4">
                   <p className="text-sm text-muted-foreground">风险点数量</p>
                   <p className="text-lg font-bold">{result.risks?.length || 0}</p>
                 </div>
               </div>
 
               {/* 审查摘要 */}
-              <div className="rounded-lg border p-4">
+              <div className="rounded-xl border p-4">
                 <h3 className="font-medium mb-2">审查摘要</h3>
                 <p className="text-sm text-muted-foreground whitespace-pre-wrap">
                   {result.summary || '暂无摘要'}
@@ -342,7 +342,7 @@ function ReviewModal({
                 <div className="space-y-3">
                   <h3 className="font-medium">风险点 ({result.risks.length})</h3>
                   {result.risks.map((risk: any, index: number) => (
-                    <div key={index} className="rounded-lg border p-4">
+                    <div key={index} className="rounded-xl border p-4">
                       <div className="flex items-center gap-2">
                         <AlertTriangle className={`h-4 w-4 ${
                           risk.level === 'critical' || risk.level === 'high' ? 'text-red-500' :
@@ -368,7 +368,7 @@ function ReviewModal({
                 value={contractText}
                 onChange={(e) => setContractText(e.target.value)}
                 placeholder="请在此粘贴合同文本..."
-                className="w-full h-96 px-4 py-3 rounded-lg border bg-background resize-none focus:outline-none focus:ring-2 focus:ring-primary"
+                className="w-full h-96 px-4 py-3 rounded-lg border border-border bg-background resize-none focus:outline-none focus:ring-2 focus:ring-ring"
               />
             </div>
           )}
@@ -435,8 +435,8 @@ function CreateContractModal({ onClose, onComplete }: { onClose: () => void; onC
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-background rounded-lg shadow-lg w-full max-w-lg mx-4">
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
+      <div className="bg-background rounded-xl shadow-lg w-full max-w-lg mx-4">
         <div className="p-6 border-b">
           <h2 className="text-lg font-semibold">新建合同</h2>
         </div>
@@ -448,7 +448,7 @@ function CreateContractModal({ onClose, onComplete }: { onClose: () => void; onC
               type="text"
               value={formData.title}
               onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-              className="w-full px-3 py-2 rounded-lg border bg-background focus:outline-none focus:ring-2 focus:ring-primary"
+              className="w-full px-3 py-2 rounded-lg border border-border bg-background focus:outline-none focus:ring-2 focus:ring-ring"
               placeholder="请输入合同标题"
             />
           </div>
@@ -458,7 +458,7 @@ function CreateContractModal({ onClose, onComplete }: { onClose: () => void; onC
             <select
               value={formData.contract_type}
               onChange={(e) => setFormData({ ...formData, contract_type: e.target.value })}
-              className="w-full px-3 py-2 rounded-lg border bg-background focus:outline-none focus:ring-2 focus:ring-primary"
+              className="w-full px-3 py-2 rounded-lg border border-border bg-background focus:outline-none focus:ring-2 focus:ring-ring"
             >
               {CONTRACT_TYPES.map((type) => (
                 <option key={type.value} value={type.value}>{type.label}</option>
@@ -472,7 +472,7 @@ function CreateContractModal({ onClose, onComplete }: { onClose: () => void; onC
               type="number"
               value={formData.amount || ''}
               onChange={(e) => setFormData({ ...formData, amount: parseFloat(e.target.value) || undefined })}
-              className="w-full px-3 py-2 rounded-lg border bg-background focus:outline-none focus:ring-2 focus:ring-primary"
+              className="w-full px-3 py-2 rounded-lg border border-border bg-background focus:outline-none focus:ring-2 focus:ring-ring"
               placeholder="请输入合同金额"
             />
           </div>

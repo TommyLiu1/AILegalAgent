@@ -76,8 +76,8 @@ class BaseLegalAgent(ABC):
     
     # LLM 调用重试配置
     MAX_RETRIES = 3
-    RETRY_BASE_DELAY = 1.0  # 秒
-    RETRY_MAX_DELAY = 10.0  # 秒
+    RETRY_BASE_DELAY = 2.0  # 秒（增加基础延迟，给 API 更多恢复时间）
+    RETRY_MAX_DELAY = 15.0  # 秒
     
     # DAG 并行执行信号量（限制并发 LLM 请求数，从配置读取）
     _llm_semaphore: asyncio.Semaphore = asyncio.Semaphore(settings.AGENT_LLM_CONCURRENCY)
@@ -92,11 +92,16 @@ class BaseLegalAgent(ABC):
                     _max_conn = settings.AGENT_HTTP_MAX_CONNECTIONS
                     _keepalive_conn = settings.AGENT_HTTP_KEEPALIVE_CONNECTIONS
                     cls._shared_http_client = httpx.AsyncClient(
-                        timeout=httpx.Timeout(30.0, connect=5.0),
+                        timeout=httpx.Timeout(
+                            120.0,    # 总超时 120s（复杂文档生成需要更长时间）
+                            connect=10.0,  # 连接超时 10s
+                            read=90.0,     # 读取超时 90s（流式输出需要持续读取）
+                            write=30.0,    # 写入超时 30s
+                        ),
                         limits=httpx.Limits(
                             max_connections=_max_conn,
                             max_keepalive_connections=_keepalive_conn,
-                            keepalive_expiry=30.0,
+                            keepalive_expiry=60.0,  # 保活 60s
                         ),
                     )
                     logger.info(
@@ -223,41 +228,52 @@ class BaseLegalAgent(ABC):
         Raises:
             Exception: 所有重试失败后抛出
         """
+        import time as _time
         client = await self.get_http_client()
         last_error = None
+        _req_start = _time.monotonic()
+        _model_name = payload.get("model", "unknown")
         
         for attempt in range(1, self.MAX_RETRIES + 1):
+            _attempt_start = _time.monotonic()
             try:
                 async with self._llm_semaphore:
-                    if stream:
-                        # 流式模式需要特殊处理，这里返回 response 对象
-                        resp = await client.post(url, headers=headers, json=payload)
-                    else:
-                        resp = await client.post(url, headers=headers, json=payload)
+                    resp = await client.post(url, headers=headers, json=payload)
+                
+                _elapsed = _time.monotonic() - _attempt_start
                 
                 if resp.status_code == 200:
+                    logger.debug(f"LLM 调用成功 [model={_model_name}, attempt={attempt}, elapsed={_elapsed:.1f}s]")
                     return resp.json()
                 elif resp.status_code == 401:
-                    # 认证错误不需要重试
-                    raise Exception(f"API认证失败 (401): {resp.text}")
+                    raise Exception(f"API认证失败 (401): 请检查 API Key 是否有效。详情: {resp.text[:200]}")
                 elif resp.status_code == 429:
-                    # 速率限制，等待更长时间
+                    # 速率限制，从 Retry-After header 或使用退避
+                    retry_after = resp.headers.get("Retry-After")
+                    delay = float(retry_after) if retry_after else min(self.RETRY_BASE_DELAY * (2 ** attempt), self.RETRY_MAX_DELAY)
+                    logger.warning(f"API速率限制 (429)，等待 {delay:.1f}s 后重试 (尝试 {attempt}/{self.MAX_RETRIES}) [model={_model_name}]")
+                    await asyncio.sleep(delay)
+                    continue
+                elif resp.status_code >= 500:
+                    # 服务端错误，可重试
                     delay = min(self.RETRY_BASE_DELAY * (2 ** attempt), self.RETRY_MAX_DELAY)
-                    logger.warning(f"API速率限制 (429)，等待 {delay:.1f}s 后重试 (尝试 {attempt}/{self.MAX_RETRIES})")
+                    logger.warning(f"API服务端错误 ({resp.status_code})，等待 {delay:.1f}s 后重试 (尝试 {attempt}/{self.MAX_RETRIES}) [model={_model_name}]")
+                    last_error = Exception(f"API返回 {resp.status_code}: {resp.text[:200]}")
                     await asyncio.sleep(delay)
                     continue
                 else:
-                    raise Exception(f"API返回 {resp.status_code}: {resp.text}")
+                    raise Exception(f"API返回 {resp.status_code}: {resp.text[:200]}")
                     
             except httpx.TimeoutException as e:
                 last_error = e
+                _elapsed = _time.monotonic() - _attempt_start
                 delay = min(self.RETRY_BASE_DELAY * (2 ** attempt), self.RETRY_MAX_DELAY)
-                logger.warning(f"API超时，等待 {delay:.1f}s 后重试 (尝试 {attempt}/{self.MAX_RETRIES})")
+                logger.warning(f"API超时 ({_elapsed:.1f}s)，等待 {delay:.1f}s 后重试 (尝试 {attempt}/{self.MAX_RETRIES}) [model={_model_name}]")
                 await asyncio.sleep(delay)
             except httpx.ConnectError as e:
                 last_error = e
                 delay = min(self.RETRY_BASE_DELAY * (2 ** attempt), self.RETRY_MAX_DELAY)
-                logger.warning(f"API连接失败，等待 {delay:.1f}s 后重试 (尝试 {attempt}/{self.MAX_RETRIES})")
+                logger.warning(f"API连接失败: {e}，等待 {delay:.1f}s 后重试 (尝试 {attempt}/{self.MAX_RETRIES}) [model={_model_name}]")
                 await asyncio.sleep(delay)
             except Exception as e:
                 if "401" in str(e) or "认证" in str(e):
@@ -265,10 +281,14 @@ class BaseLegalAgent(ABC):
                 last_error = e
                 if attempt < self.MAX_RETRIES:
                     delay = min(self.RETRY_BASE_DELAY * (2 ** attempt), self.RETRY_MAX_DELAY)
-                    logger.warning(f"API调用异常: {e}，等待 {delay:.1f}s 后重试 (尝试 {attempt}/{self.MAX_RETRIES})")
+                    logger.warning(f"API调用异常: {e}，等待 {delay:.1f}s 后重试 (尝试 {attempt}/{self.MAX_RETRIES}) [model={_model_name}]")
                     await asyncio.sleep(delay)
         
-        raise Exception(f"LLM调用在 {self.MAX_RETRIES} 次重试后失败: {last_error}")
+        _total_elapsed = _time.monotonic() - _req_start
+        error_detail = str(last_error)[:300] if last_error else "未知错误"
+        raise Exception(
+            f"LLM调用在 {self.MAX_RETRIES} 次重试后失败 (总耗时 {_total_elapsed:.1f}s, model={_model_name}): {error_detail}"
+        )
     
     async def chat(
         self,
@@ -452,24 +472,46 @@ class BaseLegalAgent(ABC):
             return "Task limit reached without final answer."
             
         except Exception as e:
-            # MOCK MODE
             error_str = str(e)
-            is_auth_error = "Incorrect API key provided" in error_str or "401" in error_str or "认证" in error_str
-            is_conn_error = "ConnectError" in error_str or "Timeout" in error_str or "timed out" in error_str or "Connection refused" in error_str
             
+            # 获取当前 LLM 配置信息
             active_config = llm_config or _task_llm_config_var.get(None) or self.llm_config
             api_key = getattr(active_config, "api_key", "") if active_config else ""
             api_base_url = getattr(active_config, "api_base_url", "") if active_config else ""
             
-            is_dummy_key = "dummy" in api_key or not api_key
+            # 严格判断：只在 API Key 明确为 dummy/测试/空值 时才使用 Mock 模式
+            # 绝不在真实 API Key 失败时返回 Mock（那样会让用户误以为得到了真实回答）
+            is_explicitly_dummy = (
+                not api_key
+                or api_key.startswith("dummy")
+                or api_key.startswith("sk-test")
+                or api_key == "your-api-key-here"
+                or len(api_key) < 10
+            )
             
-            if is_auth_error or (is_conn_error and is_dummy_key) or (is_dummy_key and "api.openai.com" in api_base_url):
-                logger.warning(f"API调用失败或使用测试Key ({error_str})，使用模拟响应 (Mock Mode) - Agent: {self.name}")
-                return self._get_mock_response(message)
-                
-            logger.error(f"对话失败: {e}")
-            await self.broadcast_status("error", f"{self.name} 发生错误: {str(e)}")
-            return f"处理失败: {str(e)}"
+            if is_explicitly_dummy:
+                logger.warning(f"未配置有效的 API Key，使用模拟响应 (Mock Mode) - Agent: {self.name}")
+                mock_resp = self._get_mock_response(message)
+                # 在 Mock 响应中明确标注这是模拟数据
+                return (
+                    f"⚠️ **当前为演示模式** — 未检测到有效的 LLM API Key，以下为模拟响应：\n\n"
+                    f"{mock_resp}\n\n"
+                    f"---\n*如需真实 AI 分析，请在「设置 → LLM 配置」中配置有效的 API Key。*"
+                )
+            
+            # 真实 API Key 但调用失败 — 返回明确的错误信息而非 Mock
+            logger.error(f"Agent [{self.name}] 调用失败: {e}")
+            await self.broadcast_status("error", f"{self.name} 发生错误: {str(e)[:100]}")
+            
+            # 构建包含诊断信息的错误响应
+            if "401" in error_str or "Incorrect API key" in error_str:
+                return f"处理失败: API Key 认证错误。请检查您的 LLM 配置是否正确（设置 → LLM 配置）。"
+            elif "429" in error_str or "rate limit" in error_str.lower():
+                return f"处理失败: API 请求频率超限，请稍后重试。"
+            elif "timeout" in error_str.lower() or "超时" in error_str:
+                return f"处理失败: 请求超时（{error_str[:100]}）。建议稍后重试或简化您的问题。"
+            else:
+                return f"处理失败: {error_str[:200]}"
 
     async def stream_chat(
         self,
@@ -494,6 +536,7 @@ class BaseLegalAgent(ABC):
         queue: asyncio.Queue = asyncio.Queue()
         
         async def _stream_worker():
+            _msg = message
             try:
                 system_prompt = system_prompt_override or self.system_prompt
                 active_config = llm_config or _task_llm_config_var.get(None) or self.llm_config
@@ -505,18 +548,15 @@ class BaseLegalAgent(ABC):
                     temperature = 1.0
                 
                 # 防护：确保 user 消息不为空
-                # 注意：不能对闭包变量 message 赋值，否则 Python 会将其视为局部变量
-                # 导致 UnboundLocalError
-                user_message = message
-                if not user_message or not user_message.strip():
+                if not _msg or not _msg.strip():
                     logger.warning(f"Agent {self.name}: stream_chat 收到空的用户消息，使用默认提示")
-                    user_message = "请根据上下文提供分析和建议。"
+                    _msg = "请根据上下文提供分析和建议。"
                 
                 payload = {
                     "model": model_name,
                     "messages": [
                         {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": user_message}
+                        {"role": "user", "content": _msg}
                     ],
                     "temperature": temperature,
                     "stream": True,
@@ -524,32 +564,69 @@ class BaseLegalAgent(ABC):
                 
                 client = await self.get_http_client()
                 
-                async with client.stream("POST", url, headers=headers, json=payload) as resp:
-                    if resp.status_code != 200:
-                        error_body = await resp.aread()
-                        await queue.put(f"[Error] API returned {resp.status_code}")
-                        await queue.put(None)
-                        return
-                    
-                    async for line in resp.aiter_lines():
-                        if line.startswith("data: "):
-                            data_str = line[6:]
-                            if data_str.strip() == "[DONE]":
-                                break
-                            try:
-                                data = json.loads(data_str)
-                                delta = data["choices"][0].get("delta", {})
-                                token = delta.get("content", "")
-                                if token:
-                                    await queue.put(token)
-                            except (json.JSONDecodeError, KeyError, IndexError):
+                # 流式请求带重试（最多 2 次重试）
+                _max_stream_retries = 2
+                for _stream_attempt in range(1, _max_stream_retries + 1):
+                    try:
+                        async with client.stream("POST", url, headers=headers, json=payload, timeout=httpx.Timeout(180.0, connect=10.0)) as resp:
+                            if resp.status_code == 429:
+                                # 速率限制，短暂等待后重试
+                                delay = min(2.0 * (2 ** _stream_attempt), 15.0)
+                                logger.warning(f"流式API速率限制 (429)，等待 {delay:.1f}s 后重试 [{_stream_attempt}/{_max_stream_retries}]")
+                                await asyncio.sleep(delay)
                                 continue
+                            elif resp.status_code != 200:
+                                error_body = await resp.aread()
+                                error_text = error_body.decode("utf-8", errors="replace")[:200]
+                                if resp.status_code >= 500 and _stream_attempt < _max_stream_retries:
+                                    delay = 2.0 * _stream_attempt
+                                    logger.warning(f"流式API服务端错误 ({resp.status_code})，{delay}s 后重试 [{_stream_attempt}/{_max_stream_retries}]")
+                                    await asyncio.sleep(delay)
+                                    continue
+                                await queue.put(f"[Error] API返回 {resp.status_code}: {error_text}")
+                                await queue.put(None)
+                                return
+                            
+                            async for line in resp.aiter_lines():
+                                if line.startswith("data: "):
+                                    data_str = line[6:]
+                                    if data_str.strip() == "[DONE]":
+                                        break
+                                    try:
+                                        data = json.loads(data_str)
+                                        delta = data["choices"][0].get("delta", {})
+                                        token = delta.get("content", "")
+                                        if token:
+                                            await queue.put(token)
+                                    except (json.JSONDecodeError, KeyError, IndexError):
+                                        continue
+                        
+                        # 成功完成，退出重试循环
+                        break
+                    except (httpx.TimeoutException, httpx.ConnectError) as stream_retry_err:
+                        if _stream_attempt < _max_stream_retries:
+                            delay = 2.0 * _stream_attempt
+                            logger.warning(f"流式请求超时/连接失败: {stream_retry_err}，{delay}s 后重试 [{_stream_attempt}/{_max_stream_retries}]")
+                            await asyncio.sleep(delay)
+                        else:
+                            raise
                 
                 await queue.put(None)  # 流结束信号
                 
             except Exception as e:
-                logger.error(f"流式对话失败: {e}")
-                await queue.put(f"[Error] {str(e)}")
+                logger.error(f"流式对话失败 (Agent={self.name}): {e}")
+                # 降级：尝试使用同步 chat 获取完整响应
+                try:
+                    logger.info(f"流式失败，降级到同步 chat (Agent={self.name})")
+                    sync_response = await self.chat(_msg, llm_config=llm_config, system_prompt_override=system_prompt_override)
+                    # 将同步结果分块推入队列模拟流式输出
+                    _chunk_size = 4
+                    for i in range(0, len(sync_response), _chunk_size):
+                        await queue.put(sync_response[i:i + _chunk_size])
+                        await asyncio.sleep(0.01)
+                except Exception as fallback_err:
+                    logger.error(f"同步降级也失败 (Agent={self.name}): {fallback_err}")
+                    await queue.put(f"[Error] {str(e)}")
                 await queue.put(None)
         
         # 在后台启动流式 worker

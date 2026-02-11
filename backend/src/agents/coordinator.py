@@ -266,7 +266,10 @@ class CoordinatorAgent(BaseLegalAgent):
         has_files = bool(context.get("files") or context.get("processed_files"))
         conversation_turns = context.get("conversation_turns", 0)
         has_sufficient_info = context.get("has_sufficient_info", False)
-        frontend_mode = context.get("mode", "chat")  # 前端功能模式药丸
+        frontend_mode = context.get("mode", "chat")  # 前端功能模式：仅 chat | deep_analysis
+        # 兼容旧版/扩展：合同/文书/研究模式统一按专业模式（深度分析）处理
+        if frontend_mode in ("contract", "document", "research"):
+            frontend_mode = "deep_analysis"
         
         # --- 意图清晰度评估 ---
         desc_len = len(description)
@@ -519,19 +522,49 @@ class CoordinatorAgent(BaseLegalAgent):
     # 关键词 → 意图映射表（按优先级排列，越靠前越优先）
     _KEYWORD_INTENT_RULES = [
         # (关键词列表, 意图, 置信度)
+        # 注意：使用单独的短关键词确保匹配"审查...合同"等分散式表达
         (["电子签", "发起签约", "签字", "签署"], "E_SIGNATURE", 0.92),
         (["归档", "合同到期", "履约提醒", "合同管理", "合同状态"], "CONTRACT_MANAGEMENT", 0.90),
         (["发布制度", "签收", "全员通知", "公告", "员工手册发布"], "POLICY_DISTRIBUTION", 0.90),
-        (["审查合同", "合同审查", "审合同", "条款审核", "合同风险"], "CONTRACT_REVIEW", 0.90),
+        (["审查合同", "合同审查", "审合同", "条款审核", "合同风险", "审查协议", "审核合同"], "CONTRACT_REVIEW", 0.90),
         (["起草", "草拟", "写一份", "拟一份", "律师函", "法律文书", "法律意见书"], "DOCUMENT_DRAFTING", 0.90),
         (["尽职调查", "尽调", "背景调查", "企业调查", "查公司"], "DUE_DILIGENCE", 0.90),
         (["诉讼策略", "起诉", "胜诉", "败诉", "庭审", "反诉", "仲裁"], "LITIGATION_STRATEGY", 0.88),
         (["风险评估", "合规检查", "合规审查", "合规风险"], "REGULATORY_MONITORING", 0.88),
         (["专利", "商标", "侵权", "知识产权", "版权"], "IP_PROTECTION", 0.88),
-        (["辞退", "劳动合同", "劳动仲裁", "工资拖欠", "员工", "入职", "试用期", "社保", "劳动争议", "劳动法", "工伤"], "LABOR_HR", 0.88),
+        (["辞退", "劳动合同", "劳动仲裁", "工资拖欠", "员工", "入职", "试用期", "社保", "劳动争议", "劳动法", "工伤", "劳动人事", "人事"], "LABOR_HR", 0.88),
         (["发票", "报销", "税务", "财税", "避税", "税收", "股权转让"], "TAX_FINANCE", 0.88),
         (["录音", "证据", "鉴定", "证据链"], "EVIDENCE_PROCESSING", 0.88),
-        (["新规", "政策", "法规解读", "监管"], "REGULATORY_MONITORING", 0.85),
+        (["新规", "政策", "法规解读", "法规查询", "法规", "监管"], "REGULATORY_MONITORING", 0.85),
+    ]
+    
+    # 组合关键词规则：当多个短关键词同时出现时匹配意图
+    _COMBO_KEYWORD_RULES = [
+        # (关键词组合（必须全部出现）, 意图, 置信度)
+        # —— 合同审查（高优先级：即使含"劳动""租赁"等修饰，审查行为优先）
+        (["审查", "合同"], "CONTRACT_REVIEW", 0.92),
+        (["审核", "合同"], "CONTRACT_REVIEW", 0.90),
+        (["审查", "协议"], "CONTRACT_REVIEW", 0.90),
+        (["审核", "协议"], "CONTRACT_REVIEW", 0.88),
+        (["合同", "风险"], "CONTRACT_REVIEW", 0.85),
+        (["审查", "条款"], "CONTRACT_REVIEW", 0.88),
+        # —— 文书起草
+        (["起草", "合同"], "DOCUMENT_DRAFTING", 0.90),
+        (["起草", "文件"], "DOCUMENT_DRAFTING", 0.88),
+        (["起草", "文书"], "DOCUMENT_DRAFTING", 0.88),
+        (["写", "合同"], "DOCUMENT_DRAFTING", 0.85),
+        (["写", "文件"], "DOCUMENT_DRAFTING", 0.85),
+        (["拟", "协议"], "DOCUMENT_DRAFTING", 0.85),
+        # —— 诉讼
+        (["起诉", "策略"], "LITIGATION_STRATEGY", 0.88),
+        # —— 合规/监管
+        (["合规", "风险"], "REGULATORY_MONITORING", 0.85),
+        # —— 尽调
+        (["查", "公司"], "DUE_DILIGENCE", 0.85),
+        (["调查", "企业"], "DUE_DILIGENCE", 0.85),
+        (["背景", "公司"], "DUE_DILIGENCE", 0.85),
+        # —— 通用
+        (["评估", "风险"], "QA_CONSULTATION", 0.82),
     ]
     
     def _fast_keyword_intent(self, description: str) -> Optional[Dict[str, Any]]:
@@ -539,8 +572,21 @@ class CoordinatorAgent(BaseLegalAgent):
         基于关键词的极速意图匹配（无 LLM 调用，< 1ms）。
         
         覆盖 80% 的常见法务场景，仅在匹配置信度 >= 0.8 时使用。
+        优先级：组合关键词（更精确） > 单关键词（更宽泛）
         """
         desc_lower = description.lower()
+        
+        # 1. 先尝试组合关键词匹配（更精确，需要多个关键词同时出现）
+        #    例如 "审查...劳动合同" 中同时有 "审查" 和 "合同" → CONTRACT_REVIEW
+        for combo_keywords, intent, confidence in self._COMBO_KEYWORD_RULES:
+            if all(kw in desc_lower for kw in combo_keywords):
+                return {
+                    "intent": intent,
+                    "confidence": confidence,
+                    "reasoning": f"组合关键词匹配: {combo_keywords}",
+                }
+        
+        # 2. 单关键词匹配
         for keywords, intent, confidence in self._KEYWORD_INTENT_RULES:
             matched = sum(1 for kw in keywords if kw in desc_lower)
             if matched >= 1:
@@ -551,6 +597,7 @@ class CoordinatorAgent(BaseLegalAgent):
                     "confidence": min(confidence + boost, 0.99),
                     "reasoning": f"关键词匹配: {[kw for kw in keywords if kw in desc_lower]}",
                 }
+        
         return None
 
     async def _classify_intent(self, description: str) -> Dict[str, Any]:
@@ -572,11 +619,10 @@ class CoordinatorAgent(BaseLegalAgent):
         try:
             prompt = f"用户输入：{description}\n\n请分析意图（只输出JSON）："
             
-            # 使用 system_prompt_override + max_tokens 限制，加速意图分类响应
+            # 使用 system_prompt_override 加速意图分类响应
             response_text = await self.chat(
                 prompt,
                 system_prompt_override=INTENT_CLASSIFICATION_PROMPT,
-                max_tokens=256,  # 意图分类只需要短 JSON，限制输出长度加速响应
             )
             
             result = self._parse_json(response_text)
@@ -590,8 +636,47 @@ class CoordinatorAgent(BaseLegalAgent):
             return result
             
         except Exception as e:
-            logger.error(f"意图识别失败: {e}")
-            return {"intent": "COMPLEX_TASK", "confidence": 0.0}
+            logger.error(f"LLM 意图识别失败: {e}")
+            # LLM 不可用时，使用规则引擎兜底（避免走 COMPLEX_TASK → 再次调 LLM 的死循环）
+            fallback = self._rule_based_intent(description)
+            logger.info(f"使用规则引擎兜底意图: {fallback.get('intent')}")
+            return fallback
+
+    def _rule_based_intent(self, description: str) -> Dict[str, Any]:
+        """
+        规则引擎兜底意图分类 — 当 LLM 不可用时使用。
+        
+        尽可能匹配到具体意图（避免走 COMPLEX_TASK 路径触发更多 LLM 调用）。
+        """
+        desc = description.lower()
+        
+        # 按优先级匹配
+        rules = [
+            (["审查", "审核"], ["合同", "协议", "条款"], "CONTRACT_REVIEW"),
+            (["起草", "草拟", "写", "拟"], ["合同", "协议", "文书", "律师函", "意见书", "文件", "文档", "报告"], "DOCUMENT_DRAFTING"),
+            (["起诉", "诉讼", "仲裁"], [], "LITIGATION_STRATEGY"),
+            (["尽职调查", "尽调", "背景调查"], [], "DUE_DILIGENCE"),
+            (["劳动", "辞退", "入职", "试用期", "员工", "社保", "工伤"], [], "LABOR_HR"),
+            (["专利", "商标", "侵权", "版权", "知识产权"], [], "IP_PROTECTION"),
+            (["税", "发票", "报销", "财务"], [], "TAX_FINANCE"),
+            (["监管", "合规", "新规", "政策"], [], "REGULATORY_MONITORING"),
+            (["证据", "录音", "鉴定"], [], "EVIDENCE_PROCESSING"),
+            (["签约", "签署", "电子签"], [], "E_SIGNATURE"),
+            (["归档", "合同到期", "履约"], [], "CONTRACT_MANAGEMENT"),
+        ]
+        
+        for primary_kws, secondary_kws, intent in rules:
+            has_primary = any(kw in desc for kw in primary_kws)
+            if has_primary:
+                if secondary_kws:
+                    has_secondary = any(kw in desc for kw in secondary_kws)
+                    if has_secondary:
+                        return {"intent": intent, "confidence": 0.82, "reasoning": f"规则引擎兜底: {intent}"}
+                else:
+                    return {"intent": intent, "confidence": 0.80, "reasoning": f"规则引擎兜底: {intent}"}
+        
+        # 最终兜底：用 legal_advisor 处理（QA_CONSULTATION 走单 Agent 快速路径）
+        return {"intent": "QA_CONSULTATION", "confidence": 0.60, "reasoning": "规则引擎兜底: 无法匹配具体意图，使用法律顾问处理"}
 
     def _cleanup_intent_cache(self):
         """清理过期的意图缓存条目"""
@@ -661,7 +746,16 @@ class CoordinatorAgent(BaseLegalAgent):
                 system_prompt_override=final_prompt_sys
             )
             
+            # 检查是否是 Mock/演示模式响应
+            if not response_text or "演示模式" in response_text or "Mock" in response_text or "API Key" in response_text:
+                logger.warning(f"DAG 规划返回了非法结果（可能是 Mock 模式），使用规则引擎兜底")
+                return await self._fallback_analysis(description)
+            
             plan_data = self._parse_json(response_text)
+            if not plan_data or not plan_data.get("plan"):
+                logger.warning(f"DAG 规划 JSON 解析失败或计划为空，使用规则引擎兜底")
+                return await self._fallback_analysis(description)
+            
             plan_data["intent"] = intent
             return plan_data
             
@@ -672,18 +766,50 @@ class CoordinatorAgent(BaseLegalAgent):
     async def _fallback_analysis(self, description: str) -> Dict[str, Any]:
         """兜底规划（规则引擎）"""
         agents = ["legal_advisor"]
+        intent = "QA_CONSULTATION"
         
-        if "合同" in description: agents = ["contract_reviewer"]
-        elif "尽调" in description: agents = ["due_diligence"]
-        elif "诉讼" in description or "仲裁" in description: agents = ["litigation_strategist"]
-        elif "知识产权" in description or "专利" in description or "商标" in description or "侵权" in description: agents = ["ip_specialist"]
-        elif "监管" in description or "新规" in description or "政策" in description: agents = ["regulatory_monitor"]
-        elif "税" in description or "财务" in description or "发票" in description: agents = ["tax_compliance"]
-        elif "员工" in description or "辞退" in description or "劳动" in description or "入职" in description: agents = ["labor_compliance"]
-        elif "证据" in description or "录音" in description or "扫描" in description or "图片" in description: agents = ["evidence_analyst"]
-        elif "签约" in description or "签字" in description or "盖章" in description: agents = ["contract_steward"]
-        elif "归档" in description or "提醒" in description or "到期" in description: agents = ["contract_steward"]
-        elif "制度" in description or "公告" in description or "手册" in description or "通知" in description: agents = ["labor_compliance"]
+        if any(kw in description for kw in ["审查合同", "合同审查", "审核合同", "条款审查"]):
+            agents = ["contract_reviewer"]
+            intent = "CONTRACT_REVIEW"
+        elif any(kw in description for kw in ["起草", "草拟", "写一份", "拟一份", "律师函", "法律文书", "法律意见书", "起诉状", "答辩状"]):
+            agents = ["document_drafter"]
+            intent = "DOCUMENT_DRAFTING"
+        elif "合同" in description and ("风险" in description or "评估" in description):
+            agents = ["contract_reviewer"]
+            intent = "CONTRACT_REVIEW"
+        elif "合同" in description:
+            agents = ["contract_reviewer"]
+            intent = "CONTRACT_REVIEW"
+        elif any(kw in description for kw in ["尽调", "尽职调查", "背景调查", "企业调查", "查公司"]):
+            agents = ["due_diligence"]
+            intent = "DUE_DILIGENCE"
+        elif any(kw in description for kw in ["诉讼", "仲裁", "起诉", "胜诉", "败诉", "庭审"]):
+            agents = ["litigation_strategist"]
+            intent = "LITIGATION_STRATEGY"
+        elif any(kw in description for kw in ["知识产权", "专利", "商标", "侵权", "版权", "著作权"]):
+            agents = ["ip_specialist"]
+            intent = "IP_PROTECTION"
+        elif any(kw in description for kw in ["监管", "新规", "政策", "法规解读"]):
+            agents = ["regulatory_monitor"]
+            intent = "REGULATORY_MONITORING"
+        elif any(kw in description for kw in ["税", "财务", "发票", "报销", "股权转让"]):
+            agents = ["tax_compliance"]
+            intent = "TAX_FINANCE"
+        elif any(kw in description for kw in ["员工", "辞退", "劳动", "入职", "社保", "工伤", "试用期", "劳动人事", "人事"]):
+            agents = ["labor_compliance"]
+            intent = "LABOR_HR"
+        elif any(kw in description for kw in ["证据", "录音", "扫描", "证据链", "鉴定"]):
+            agents = ["evidence_analyst"]
+            intent = "EVIDENCE_PROCESSING"
+        elif any(kw in description for kw in ["签约", "签字", "盖章", "电子签"]):
+            agents = ["contract_steward"]
+            intent = "E_SIGNATURE"
+        elif any(kw in description for kw in ["归档", "提醒", "到期", "合同管理", "合同状态"]):
+            agents = ["contract_steward"]
+            intent = "CONTRACT_MANAGEMENT"
+        elif any(kw in description for kw in ["制度", "公告", "手册", "通知", "宣贯"]):
+            agents = ["labor_compliance"]
+            intent = "POLICY_DISTRIBUTION"
         
         plan = [{
             "id": "task_1",
@@ -695,8 +821,8 @@ class CoordinatorAgent(BaseLegalAgent):
         return {
             "analysis": "规则引擎兜底规划",
             "plan": plan,
-            "intent": "UNKNOWN",
-            "reasoning": "Fallback",
+            "intent": intent,
+            "reasoning": f"规则引擎分配到 {agents[0]}",
             "total_steps": 1
         }
 
@@ -716,16 +842,61 @@ class CoordinatorAgent(BaseLegalAgent):
         return {}
 
     async def aggregate_results(self, results: List[AgentResponse]) -> Dict[str, Any]:
-        """汇总结果"""
+        """汇总多 Agent 执行结果 — 优先用 LLM 智能汇总，降级用模板拼接"""
         from datetime import datetime
         
-        summary = "任务执行完成。\n\n"
-        for r in results:
-            if isinstance(r, AgentResponse):
-                summary += f"### {r.agent_name}\n{r.content}\n\n"
+        # 1. 只取有效结果
+        valid_results = [r for r in results if isinstance(r, AgentResponse) and r.content]
+        if not valid_results:
+            return {"summary": "任务执行完成，但未产生有效结果。", "agent_count": 0, "generated_at": datetime.now().isoformat()}
+        
+        # 2. 如果只有一个结果，直接返回（不需要汇总）
+        if len(valid_results) == 1:
+            return {
+                "summary": valid_results[0].content,
+                "agent_count": 1,
+                "generated_at": datetime.now().isoformat()
+            }
+        
+        # 3. 多个结果 — 尝试 LLM 智能汇总
+        try:
+            from src.agents.base import _task_llm_config_var
+            llm_config = _task_llm_config_var.get(None) or self.llm_config
+            
+            if llm_config:
+                agent_sections = "\n\n".join(
+                    f"### {r.agent_name} 的分析\n{r.content[:3000]}"
+                    for r in valid_results
+                )
                 
+                summarize_prompt = (
+                    f"你是一位专业的法律事务总结专家。以下是多个AI法律助手对同一任务的分析结果：\n\n"
+                    f"{agent_sections}\n\n"
+                    f"请将上述内容综合整理为一份完整、连贯的专业回复。要求：\n"
+                    f"1. 按逻辑顺序组织内容（不是简单拼接）\n"
+                    f"2. 去除重复内容，保留关键观点\n"
+                    f"3. 如有不同观点，指出分歧和建议\n"
+                    f"4. 最后给出明确的行动建议\n"
+                    f"5. 使用中文回复，格式清晰（使用标题、列表等）"
+                )
+                
+                summary = await self.agent.chat(summarize_prompt, llm_config=llm_config)
+                if summary and not summary.startswith("处理失败"):
+                    return {
+                        "summary": summary,
+                        "agent_count": len(valid_results),
+                        "generated_at": datetime.now().isoformat()
+                    }
+        except Exception as e:
+            logger.warning(f"LLM 汇总失败，降级到模板拼接: {e}")
+        
+        # 4. 降级：模板拼接
+        summary = "## 任务执行完成\n\n以下是各智能体的分析结果：\n\n"
+        for r in valid_results:
+            summary += f"### {r.agent_name}\n{r.content}\n\n---\n\n"
+        
         return {
             "summary": summary,
-            "agent_count": len(results),
+            "agent_count": len(valid_results),
             "generated_at": datetime.now().isoformat()
         }

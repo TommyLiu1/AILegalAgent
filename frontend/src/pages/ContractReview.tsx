@@ -179,21 +179,21 @@ export default function ContractReview({ embedded = false }: { embedded?: boolea
   };
   
   return (
-    <div className="h-full flex flex-col bg-[#F2F2F7]">
+    <div className="h-full flex flex-col bg-muted">
       {/* Header */}
       {!embedded && (
-      <div className="bg-white border-b border-[#E5E5EA] px-6 py-4">
+      <div className="bg-card border-b border-border px-6 py-4">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-xl font-semibold text-[#1C1C1E]">合同智能审查</h1>
-            <p className="text-sm text-[#8E8E93] mt-1">
+            <h1 className="text-2xl font-bold tracking-tight text-foreground">合同智能审查</h1>
+            <p className="text-sm text-muted-foreground mt-1">
               上传合同文档，AI 自动识别风险条款并提供修改建议
             </p>
           </div>
           {step !== 'upload' && (
             <button
               onClick={resetReview}
-              className="flex items-center gap-2 px-4 py-2 text-[#007AFF] hover:bg-[#F2F2F7] rounded-lg transition-colors"
+              className="flex items-center gap-2 px-4 py-2 text-primary hover:bg-muted rounded-lg transition-colors"
             >
               <RefreshCw className="w-4 h-4" />
               重新审查
@@ -207,12 +207,12 @@ export default function ContractReview({ embedded = false }: { embedded?: boolea
             <div key={s} className="flex items-center">
               <div className={`flex items-center gap-2 px-3 py-1 rounded-full text-sm ${
                 step === s 
-                  ? 'bg-[#007AFF] text-white' 
+                  ? 'bg-primary text-white' 
                   : ['upload', 'parsing', 'reviewing', 'complete'].indexOf(step) > i
                     ? 'bg-green-100 text-green-700'
-                    : 'bg-[#F2F2F7] text-[#8E8E93]'
+                    : 'bg-muted text-muted-foreground'
               }`}>
-                <span className="w-5 h-5 flex items-center justify-center rounded-full bg-white/20 text-xs">
+                <span className="w-5 h-5 flex items-center justify-center rounded-full bg-card/20 text-xs">
                   {i + 1}
                 </span>
                 {{
@@ -222,7 +222,7 @@ export default function ContractReview({ embedded = false }: { embedded?: boolea
                   complete: '审查完成',
                 }[s]}
               </div>
-              {i < 3 && <ChevronRight className="w-4 h-4 text-[#8E8E93] mx-2" />}
+              {i < 3 && <ChevronRight className="w-4 h-4 text-muted-foreground mx-2" />}
             </div>
           ))}
         </div>
@@ -231,7 +231,7 @@ export default function ContractReview({ embedded = false }: { embedded?: boolea
 
       {/* Embedded Header/Toolbar */}
       {embedded && (
-        <div className="bg-white border-b border-[#E5E5EA] px-6 py-3">
+        <div className="bg-card border-b border-border px-6 py-3">
            <div className="flex items-center justify-between">
               {/* Progress Steps for Embedded View */}
               <div className="flex items-center gap-2">
@@ -239,10 +239,10 @@ export default function ContractReview({ embedded = false }: { embedded?: boolea
                     <div key={s} className="flex items-center">
                     <div className={`flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium ${
                         step === s 
-                        ? 'bg-[#007AFF] text-white' 
+                        ? 'bg-primary text-white' 
                         : ['upload', 'parsing', 'reviewing', 'complete'].indexOf(step) > i
                             ? 'bg-green-100 text-green-700'
-                            : 'bg-[#F2F2F7] text-[#8E8E93]'
+                            : 'bg-muted text-muted-foreground'
                     }`}>
                         <span>{i + 1}</span>
                         <span>{{
@@ -252,7 +252,7 @@ export default function ContractReview({ embedded = false }: { embedded?: boolea
                         complete: '完成',
                         }[s]}</span>
                     </div>
-                    {i < 3 && <ChevronRight className="w-3 h-3 text-[#8E8E93] mx-1" />}
+                    {i < 3 && <ChevronRight className="w-3 h-3 text-muted-foreground mx-1" />}
                     </div>
                 ))}
               </div>
@@ -260,7 +260,7 @@ export default function ContractReview({ embedded = false }: { embedded?: boolea
               {step !== 'upload' && (
                 <button
                 onClick={resetReview}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-[#007AFF] hover:bg-[#F2F2F7] rounded-md transition-colors border border-transparent hover:border-[#E5E5EA]"
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-primary hover:bg-muted rounded-md transition-colors border border-transparent hover:border-border"
                 >
                 <RefreshCw className="w-3.5 h-3.5" />
                 重新审查
@@ -286,18 +286,18 @@ export default function ContractReview({ embedded = false }: { embedded?: boolea
                 onDragOver={(e) => e.preventDefault()}
                 onDrop={handleFileDrop}
                 onClick={() => fileInputRef.current?.click()}
-                className="border-2 border-dashed border-[#E5E5EA] rounded-2xl p-12 text-center bg-white hover:border-[#007AFF] hover:bg-blue-50/30 transition-all cursor-pointer"
+                className="border-2 border-dashed border-border rounded-xl p-12 text-center bg-card hover:border-primary hover:bg-blue-50/30 transition-all cursor-pointer"
               >
-                <div className="w-16 h-16 mx-auto mb-4 bg-[#007AFF]/10 rounded-2xl flex items-center justify-center">
-                  <Upload className="w-8 h-8 text-[#007AFF]" />
+                <div className="w-16 h-16 mx-auto mb-4 bg-primary/10 rounded-xl flex items-center justify-center">
+                  <Upload className="w-8 h-8 text-primary" />
                 </div>
-                <h3 className="text-lg font-medium text-[#1C1C1E] mb-2">
+                <h3 className="text-lg font-medium text-foreground mb-2">
                   拖放合同文件到这里
                 </h3>
-                <p className="text-[#8E8E93] mb-4">
+                <p className="text-muted-foreground mb-4">
                   或点击选择文件
                 </p>
-                <p className="text-xs text-[#8E8E93]">
+                <p className="text-xs text-muted-foreground">
                   支持 PDF、Word (.docx)、TXT 格式，最大 20MB
                 </p>
                 <input
@@ -312,20 +312,20 @@ export default function ContractReview({ embedded = false }: { embedded?: boolea
               {/* 或者直接输入文本 */}
               <div className="mt-6">
                 <div className="flex items-center gap-4 mb-4">
-                  <div className="flex-1 h-px bg-[#E5E5EA]" />
-                  <span className="text-sm text-[#8E8E93]">或者直接粘贴合同文本</span>
-                  <div className="flex-1 h-px bg-[#E5E5EA]" />
+                  <div className="flex-1 h-px bg-border" />
+                  <span className="text-sm text-muted-foreground">或者直接粘贴合同文本</span>
+                  <div className="flex-1 h-px bg-border" />
                 </div>
                 <textarea
                   value={contractText}
                   onChange={(e) => setContractText(e.target.value)}
                   placeholder="在此粘贴合同文本内容..."
-                  className="w-full h-48 p-4 border border-[#E5E5EA] rounded-xl bg-white resize-none focus:outline-none focus:ring-2 focus:ring-[#007AFF] focus:border-transparent"
+                  className="w-full h-48 p-4 border border-border rounded-xl bg-card resize-none focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
                 />
                 {contractText && (
                   <button
                     onClick={() => startReview(contractText)}
-                    className="mt-4 w-full py-3 bg-[#007AFF] text-white rounded-xl font-medium hover:bg-[#0056b3] transition-colors flex items-center justify-center gap-2"
+                    className="mt-4 w-full py-3 bg-primary text-white rounded-xl font-medium hover:bg-primary/90 transition-colors flex items-center justify-center gap-2"
                   >
                     <Sparkles className="w-5 h-5" />
                     开始智能审查
@@ -344,25 +344,25 @@ export default function ContractReview({ embedded = false }: { embedded?: boolea
               exit={{ opacity: 0, y: -20 }}
               className="max-w-lg mx-auto text-center"
             >
-              <div className="bg-white rounded-2xl p-8 shadow-sm">
-                <div className="w-20 h-20 mx-auto mb-6 bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl flex items-center justify-center">
+              <div className="bg-card rounded-xl p-8 shadow-sm">
+                <div className="w-20 h-20 mx-auto mb-6 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center">
                   <Loader2 className="w-10 h-10 text-white animate-spin" />
                 </div>
-                <h3 className="text-xl font-semibold text-[#1C1C1E] mb-2">
+                <h3 className="text-xl font-semibold text-foreground mb-2">
                   {step === 'parsing' ? '正在解析文档' : '智能审查中'}
                 </h3>
-                <div className="flex items-center justify-center gap-2 text-[#007AFF] mb-4">
+                <div className="flex items-center justify-center gap-2 text-primary mb-4">
                   <Sparkles className="w-4 h-4" />
                   <span>{currentAgent}</span>
                 </div>
-                <p className="text-[#8E8E93]">{agentMessage}</p>
+                <p className="text-muted-foreground">{agentMessage}</p>
                 
                 {file && (
-                  <div className="mt-6 p-4 bg-[#F2F2F7] rounded-xl flex items-center gap-3">
-                    <FileText className="w-8 h-8 text-[#007AFF]" />
+                  <div className="mt-6 p-4 bg-muted rounded-xl flex items-center gap-3">
+                    <FileText className="w-8 h-8 text-primary" />
                     <div className="text-left flex-1">
-                      <p className="font-medium text-[#1C1C1E] truncate">{file.name}</p>
-                      <p className="text-sm text-[#8E8E93]">
+                      <p className="font-medium text-foreground truncate">{file.name}</p>
+                      <p className="text-sm text-muted-foreground">
                         {(file.size / 1024).toFixed(1)} KB
                       </p>
                     </div>
@@ -372,7 +372,7 @@ export default function ContractReview({ embedded = false }: { embedded?: boolea
                 {/* 实时显示检测到的风险 */}
                 {detectedRisks.length > 0 && (
                   <div className="mt-6 text-left">
-                    <p className="text-sm text-[#8E8E93] mb-2">已检测到 {detectedRisks.length} 个风险点</p>
+                    <p className="text-sm text-muted-foreground mb-2">已检测到 {detectedRisks.length} 个风险点</p>
                     <div className="space-y-2">
                       {detectedRisks.slice(0, 3).map((risk, i) => (
                         <motion.div
@@ -404,11 +404,11 @@ export default function ContractReview({ embedded = false }: { embedded?: boolea
               className="max-w-4xl mx-auto"
             >
               {/* Summary Card */}
-              <div className="bg-white rounded-2xl p-6 shadow-sm mb-6">
+              <div className="bg-card rounded-xl p-6 shadow-sm mb-6">
                 <div className="flex items-start justify-between">
                   <div>
-                    <h3 className="text-lg font-semibold text-[#1C1C1E] mb-2">审查结果概览</h3>
-                    <p className="text-[#8E8E93]">{reviewResult.summary}</p>
+                    <h3 className="text-lg font-semibold text-foreground mb-2">审查结果概览</h3>
+                    <p className="text-muted-foreground">{reviewResult.summary}</p>
                   </div>
                   <div className={`px-4 py-2 rounded-xl ${getRiskLevelColor(reviewResult.risk_level)}`}>
                     <div className="flex items-center gap-2">
@@ -428,7 +428,7 @@ export default function ContractReview({ embedded = false }: { embedded?: boolea
                 
                 {/* Risk Score Bar */}
                 <div className="mt-4">
-                  <div className="h-3 bg-[#F2F2F7] rounded-full overflow-hidden">
+                  <div className="h-3 bg-muted rounded-full overflow-hidden">
                     <motion.div
                       initial={{ width: 0 }}
                       animate={{ width: `${reviewResult.risk_score * 100}%` }}
@@ -444,8 +444,8 @@ export default function ContractReview({ embedded = false }: { embedded?: boolea
               </div>
               
               {/* Risks List */}
-              <div className="bg-white rounded-2xl p-6 shadow-sm mb-6">
-                <h3 className="text-lg font-semibold text-[#1C1C1E] mb-4">
+              <div className="bg-card rounded-xl p-6 shadow-sm mb-6">
+                <h3 className="text-lg font-semibold text-foreground mb-4">
                   风险条款 ({reviewResult.key_risks.length})
                 </h3>
                 <div className="space-y-4">
@@ -461,16 +461,16 @@ export default function ContractReview({ embedded = false }: { embedded?: boolea
                         {getRiskLevelIcon(risk.level)}
                         <div className="flex-1">
                           <div className="flex items-center gap-2 mb-1">
-                            <span className="font-medium text-[#1C1C1E]">{risk.title}</span>
+                            <span className="font-medium text-foreground">{risk.title}</span>
                             <span className={`text-xs px-2 py-0.5 rounded-full ${getRiskLevelColor(risk.level)}`}>
                               {risk.type}
                             </span>
                           </div>
-                          <p className="text-sm text-[#3C3C43] mb-2">{risk.description}</p>
+                          <p className="text-sm text-foreground/80 mb-2">{risk.description}</p>
                           {risk.suggestion && (
-                            <div className="flex items-start gap-2 p-2 bg-white/50 rounded-lg">
-                              <Sparkles className="w-4 h-4 text-[#007AFF] mt-0.5" />
-                              <p className="text-sm text-[#007AFF]">{risk.suggestion}</p>
+                            <div className="flex items-start gap-2 p-2 bg-card/50 rounded-lg">
+                              <Sparkles className="w-4 h-4 text-primary mt-0.5" />
+                              <p className="text-sm text-primary">{risk.suggestion}</p>
                             </div>
                           )}
                         </div>
@@ -479,7 +479,7 @@ export default function ContractReview({ embedded = false }: { embedded?: boolea
                   ))}
                   
                   {reviewResult.key_risks.length === 0 && (
-                    <div className="text-center py-8 text-[#8E8E93]">
+                    <div className="text-center py-8 text-muted-foreground">
                       <CheckCircle className="w-12 h-12 mx-auto mb-3 text-green-500" />
                       <p>未检测到明显风险条款</p>
                     </div>
@@ -489,15 +489,15 @@ export default function ContractReview({ embedded = false }: { embedded?: boolea
               
               {/* Suggestions */}
               {reviewResult.suggestions.length > 0 && (
-                <div className="bg-white rounded-2xl p-6 shadow-sm mb-6">
-                  <h3 className="text-lg font-semibold text-[#1C1C1E] mb-4">修改建议</h3>
+                <div className="bg-card rounded-xl p-6 shadow-sm mb-6">
+                  <h3 className="text-lg font-semibold text-foreground mb-4">修改建议</h3>
                   <ul className="space-y-3">
                     {reviewResult.suggestions.map((suggestion, i) => (
                       <li key={i} className="flex items-start gap-3">
-                        <span className="w-6 h-6 bg-[#007AFF] text-white rounded-full flex items-center justify-center text-sm flex-shrink-0">
+                        <span className="w-6 h-6 bg-primary text-white rounded-full flex items-center justify-center text-sm flex-shrink-0">
                           {i + 1}
                         </span>
-                        <p className="text-[#3C3C43]">{suggestion}</p>
+                        <p className="text-foreground/80">{suggestion}</p>
                       </li>
                     ))}
                   </ul>
@@ -506,11 +506,11 @@ export default function ContractReview({ embedded = false }: { embedded?: boolea
               
               {/* Actions */}
               <div className="flex gap-4">
-                <button className="flex-1 py-3 bg-[#007AFF] text-white rounded-xl font-medium hover:bg-[#0056b3] transition-colors flex items-center justify-center gap-2">
+                <button className="flex-1 py-3 bg-primary text-white rounded-xl font-medium hover:bg-primary/90 transition-colors flex items-center justify-center gap-2">
                   <Download className="w-5 h-5" />
                   导出审查报告
                 </button>
-                <button className="px-6 py-3 border border-[#E5E5EA] rounded-xl font-medium hover:bg-[#F2F2F7] transition-colors flex items-center justify-center gap-2">
+                <button className="px-6 py-3 border border-border rounded-xl font-medium hover:bg-muted transition-colors flex items-center justify-center gap-2">
                   <Copy className="w-5 h-5" />
                   复制结果
                 </button>

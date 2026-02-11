@@ -10,9 +10,9 @@
  * 6. A2UI 动态组件 — 由 Agent 推送的自定义 UI
  */
 
-import { memo, useMemo } from 'react';
+import { memo, useMemo, useState, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { LayoutDashboard, Loader2, Zap } from 'lucide-react';
+import { Loader2, Zap, Send, MessageSquarePlus } from 'lucide-react';
 import { RequirementCard } from './RequirementCard';
 import { AgentCard } from './AgentCard';
 import { AgentTaskBoard } from './AgentTaskBoard';
@@ -31,6 +31,8 @@ interface AgentWorkspaceProps {
   isProcessing: boolean;
   onWorkspaceConfirm?: (confirmationId: string, selectedIds: string[]) => void;
   onWorkspaceAction?: (actionId: string, payload?: any) => void;
+  /** 补充输入回调 — 用户在工作台输入补充信息后发送到对话流 */
+  onSupplementInput?: (text: string) => void;
 }
 
 export const AgentWorkspace = memo(function AgentWorkspace({
@@ -41,9 +43,21 @@ export const AgentWorkspace = memo(function AgentWorkspace({
   isProcessing,
   onWorkspaceConfirm,
   onWorkspaceAction,
+  onSupplementInput,
 }: AgentWorkspaceProps) {
   const store = useChatStore();
   const { workspaceConfirmations, workspaceActions, agentTasks } = store;
+  const [supplementText, setSupplementText] = useState('');
+  const [showSupplementInput, setShowSupplementInput] = useState(false);
+  const supplementInputRef = useRef<HTMLTextAreaElement>(null);
+
+  const handleSupplementSend = useCallback(() => {
+    const text = supplementText.trim();
+    if (!text || isProcessing) return;
+    onSupplementInput?.(text);
+    setSupplementText('');
+    setShowSupplementInput(false);
+  }, [supplementText, isProcessing, onSupplementInput]);
 
   // 判断是否有内容
   const hasConfirmations = workspaceConfirmations.length > 0;
@@ -59,29 +73,7 @@ export const AgentWorkspace = memo(function AgentWorkspace({
   const contractReviewVisible = store.contractReviewVisible;
 
   if (isEmpty && !isProcessing && !contractReviewVisible) {
-    return (
-      <div className="h-full flex items-center justify-center">
-        <div className="text-center space-y-4 px-8">
-          <div className="w-16 h-16 mx-auto bg-gradient-to-br from-blue-50 to-indigo-100 rounded-2xl flex items-center justify-center shadow-sm">
-            <LayoutDashboard className="w-8 h-8 text-blue-500" />
-          </div>
-          <div>
-            <h3 className="font-semibold text-gray-700 mb-1.5">智能工作台</h3>
-            <p className="text-xs text-gray-400 leading-relaxed">
-              发送消息后，此区域将实时展示<br />
-              需求分析、Agent 协作进度和处理结果
-            </p>
-          </div>
-          <div className="pt-2 flex flex-wrap gap-1.5 justify-center">
-            {['需求确认', '多Agent协作', '进度追踪', '智能交互'].map(tag => (
-              <span key={tag} className="px-2.5 py-1 bg-white rounded-lg text-[11px] text-gray-500 border border-gray-150 shadow-xs">
-                {tag}
-              </span>
-            ))}
-          </div>
-        </div>
-      </div>
-    );
+    return <div className="h-full" />;
   }
 
   // 空闲但有合同审查卡片弹出
@@ -132,6 +124,82 @@ export const AgentWorkspace = memo(function AgentWorkspace({
             </motion.div>
           ))}
         </AnimatePresence>
+
+        {/* ===== 2.5 补充输入区 — 让用户在工作台补充信息 ===== */}
+        {(hasConfirmations || requirementAnalysis || hasTasks) && (
+          <div className="relative">
+            {!showSupplementInput ? (
+              <button
+                onClick={() => {
+                  setShowSupplementInput(true);
+                  setTimeout(() => supplementInputRef.current?.focus(), 100);
+                }}
+                className="w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-400 bg-gray-50/80 hover:bg-blue-50 hover:text-blue-500 border border-dashed border-gray-200 hover:border-blue-300 rounded-xl transition-all cursor-pointer"
+              >
+                <MessageSquarePlus className="w-3.5 h-3.5" />
+                <span>补充说明或提供更多信息...</span>
+              </button>
+            ) : (
+              <AnimatePresence>
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className="bg-white border border-blue-200 rounded-xl shadow-sm overflow-hidden"
+                >
+                  <div className="px-3 py-2">
+                    <div className="flex items-center gap-1.5 mb-1.5">
+                      <MessageSquarePlus className="w-3 h-3 text-blue-500" />
+                      <span className="text-[11px] font-semibold text-blue-600">补充信息</span>
+                    </div>
+                    <textarea
+                      ref={supplementInputRef}
+                      value={supplementText}
+                      onChange={(e) => setSupplementText(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                          e.preventDefault();
+                          handleSupplementSend();
+                        }
+                        if (e.key === 'Escape') {
+                          setShowSupplementInput(false);
+                        }
+                      }}
+                      placeholder="补充需求说明，如预算范围、时间要求、特殊情况、案件详情等..."
+                      rows={3}
+                      className="w-full px-0 text-xs text-gray-700 bg-transparent resize-none focus:outline-none placeholder:text-gray-400"
+                    />
+                    <div className="flex items-center justify-between pt-1 border-t border-gray-100">
+                      <span className="text-[10px] text-gray-400">
+                        Enter 发送 · Shift+Enter 换行 · Esc 关闭
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => setShowSupplementInput(false)}
+                          className="text-[11px] text-gray-400 hover:text-gray-600 transition-colors"
+                        >
+                          取消
+                        </button>
+                        <button
+                          onClick={handleSupplementSend}
+                          disabled={!supplementText.trim() || isProcessing}
+                          className={`flex items-center gap-1 px-3 py-1 rounded-lg text-[11px] font-medium transition-all ${
+                            supplementText.trim() && !isProcessing
+                              ? 'bg-blue-600 text-white hover:bg-blue-700 active:scale-95'
+                              : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                          }`}
+                        >
+                          <Send className="w-3 h-3" />
+                          发送
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </motion.div>
+              </AnimatePresence>
+            )}
+          </div>
+        )}
 
         {/* ===== 3. Agent 协作看板（卡片式并列） ===== */}
         <AnimatePresence>

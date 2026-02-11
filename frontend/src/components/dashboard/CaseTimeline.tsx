@@ -35,39 +35,39 @@ export function CaseTimeline() {
   const statusConfig: Record<string, any> = {
     created: {
       icon: Circle,
-      color: 'text-[#007AFF]',
-      bg: 'bg-[#E5F3FF]',
-      border: 'border-[#007AFF]',
+      color: 'text-primary',
+      bg: 'bg-primary/10',
+      border: 'border-primary',
     },
     status_changed: {
       icon: Clock,
-      color: 'text-[#AF52DE]',
-      bg: 'bg-[#F5EDFF]',
-      border: 'border-[#AF52DE]',
+      color: 'text-accent',
+      bg: 'bg-accent/10',
+      border: 'border-accent',
     },
     document_linked: {
       icon: Calendar,
-      color: 'text-[#FF9500]',
-      bg: 'bg-[#FFF5E5]',
-      border: 'border-[#FF9500]',
+      color: 'text-warning',
+      bg: 'bg-warning/10',
+      border: 'border-warning',
     },
     ai_analysis: {
       icon: CheckCircle,
-      color: 'text-[#34C759]',
-      bg: 'bg-[#E8F8EE]',
-      border: 'border-[#34C759]',
+      color: 'text-success',
+      bg: 'bg-success/10',
+      border: 'border-success',
     },
     default: {
       icon: Circle,
-      color: 'text-[#8E8E93]',
-      bg: 'bg-[#F2F2F7]',
-      border: 'border-[#E5E5EA]',
+      color: 'text-muted-foreground',
+      bg: 'bg-muted',
+      border: 'border-border',
     }
   };
 
   if (loading) {
     return (
-      <div className="bg-white rounded-2xl border border-[#E5E5EA] p-6 h-[400px] flex items-center justify-center">
+      <div className="bg-white rounded-2xl border border-border p-6 h-[400px] flex items-center justify-center">
         <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
       </div>
     );
@@ -78,16 +78,16 @@ export function CaseTimeline() {
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 0.2 }}
-      className="bg-white rounded-2xl border border-[#E5E5EA] p-6"
+      className="bg-white rounded-2xl border border-border p-6"
     >
       <div className="mb-6">
-        <h3 className="font-semibold text-[#1C1C1E]">案件时间轴</h3>
-        <p className="text-sm text-[#8E8E93] mt-1">关键节点与进度追踪</p>
+        <h3 className="font-semibold text-foreground">案件时间轴</h3>
+        <p className="text-sm text-muted-foreground mt-1">关键节点与进度追踪</p>
       </div>
 
       <div className="relative">
         {/* Timeline line */}
-        <div className="absolute left-4 top-0 bottom-0 w-0.5 bg-[#E5E5EA]"></div>
+        <div className="absolute left-4 top-0 bottom-0 w-0.5 bg-border"></div>
 
         <div className="space-y-6">
           {events.length > 0 ? (
@@ -109,21 +109,21 @@ export function CaseTimeline() {
                   </div>
 
                   {/* Content */}
-                  <div className="bg-[#F2F2F7] rounded-xl p-4 border border-[#E5E5EA]">
+                  <div className="bg-muted rounded-xl p-4 border border-border">
                     <div className="flex items-start justify-between mb-2">
                       <div>
-                        <span className="text-xs font-medium text-[#8E8E93]">{event.case_number}</span>
-                        <h4 className="font-medium text-[#1C1C1E] mt-0.5">{event.title}</h4>
+                        <span className="text-xs font-medium text-muted-foreground">{event.case_number}</span>
+                        <h4 className="font-medium text-foreground mt-0.5">{event.title}</h4>
                       </div>
-                      <span className="text-xs text-[#8E8E93]">{new Date(event.event_time).toLocaleDateString()}</span>
+                      <span className="text-xs text-muted-foreground">{new Date(event.event_time).toLocaleDateString()}</span>
                     </div>
-                    <p className="text-sm text-[#3C3C43]">{event.description}</p>
+                    <p className="text-sm text-foreground/80">{event.description}</p>
                   </div>
                 </motion.div>
               );
             })
           ) : (
-            <div className="text-center py-8 text-gray-400 text-sm">暂无近期活动</div>
+            <div className="text-center py-8 text-muted-foreground/50 text-sm">暂无近期活动</div>
           )}
         </div>
       </div>

@@ -85,11 +85,11 @@ class ContractReviewAgent(BaseLegalAgent):
         """处理合同审查任务"""
         description = task.get("description", "")
         context = task.get("context") or {}
+        llm_config = context.get("llm_config") or task.get("llm_config")
         contract_type = context.get("contract_type", "通用合同")
         
         # 构建审查提示
-        prompt = f"""
-请审查以下合同文本：
+        prompt = f"""请审查以下合同文本：
 
 合同类型：{contract_type}
 
@@ -102,22 +102,26 @@ class ContractReviewAgent(BaseLegalAgent):
 4. 具体修改建议
 """
         
-        # 调用Agent
-        response = await self.chat(prompt)
-        
-        # 尝试解析JSON结果
-        review_result = self._parse_review_result(response)
-        
-        return AgentResponse(
-            agent_name=self.name,
-            content=response,
-            reasoning="基于合同法和商业惯例进行系统性审查",
-            citations=review_result.get("citations", []),
-            actions=[
-                {"type": "review_complete", "data": review_result}
-            ],
-            metadata=review_result
-        )
+        try:
+            response = await self.chat(prompt, llm_config=llm_config)
+            review_result = self._parse_review_result(response)
+            
+            return AgentResponse(
+                agent_name=self.name,
+                content=response,
+                reasoning="基于合同法和商业惯例进行系统性审查",
+                citations=review_result.get("citations", []),
+                actions=[
+                    {"type": "review_complete", "data": review_result}
+                ],
+                metadata=review_result
+            )
+        except Exception as e:
+            return AgentResponse(
+                agent_name=self.name,
+                content=f"合同审查失败: {str(e)[:200]}",
+                metadata={"error": True}
+            )
     
     def _parse_review_result(self, response: str) -> Dict[str, Any]:
         """解析审查结果"""

@@ -61,6 +61,8 @@ interface RightPanelProps {
   // 工作台交互回调
   onWorkspaceConfirm?: (confirmationId: string, selectedIds: string[]) => void;
   onWorkspaceAction?: (actionId: string, payload?: any) => void;
+  /** 补充输入回调 — 用户在工作台输入补充信息后发送到对话流 */
+  onSupplementInput?: (text: string) => void;
 }
 
 const tabs: { id: RightPanelTab; label: string; icon: React.ElementType }[] = [
@@ -79,10 +81,10 @@ export const RightPanel = memo(function RightPanel(props: RightPanelProps) {
   const hasActivity = props.agentResults.length > 0 || !!props.requirementAnalysis || !!props.a2uiData;
 
   return (
-    <div className="h-full flex flex-col bg-gray-50/50">
+    <div className="h-full flex flex-col bg-muted/50">
       {/* Tab 导航栏 */}
-      <div className="flex items-center px-3 py-2 bg-white border-b border-[#E5E5EA] flex-shrink-0">
-        <div className="flex items-center gap-1 flex-1 bg-[#F2F2F7] rounded-xl p-0.5">
+      <div className="flex items-center px-3 py-2 bg-card border-b border-border flex-shrink-0">
+        <div className="flex items-center gap-1 flex-1 bg-muted rounded-xl p-0.5">
           {tabs.map((tab) => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
@@ -94,14 +96,14 @@ export const RightPanel = memo(function RightPanel(props: RightPanelProps) {
                 onClick={() => onTabChange(tab.id)}
                 className={`relative flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg transition-all ${
                   isActive
-                    ? 'bg-white text-[#007AFF] shadow-sm'
-                    : 'text-[#8E8E93] hover:text-[#3C3C43]'
+                    ? 'bg-white text-primary shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground/80'
                 }`}
               >
                 <Icon className="w-3.5 h-3.5" />
                 <span>{tab.label}</span>
                 {hasDot && !isActive && (
-                  <span className="absolute top-1 right-2 w-1.5 h-1.5 bg-blue-500 rounded-full" />
+                  <span className="absolute top-1 right-2 w-1.5 h-1.5 bg-primary rounded-full" />
                 )}
               </button>
             );
@@ -112,10 +114,10 @@ export const RightPanel = memo(function RightPanel(props: RightPanelProps) {
         {isLive && (
           <div className="flex items-center gap-1.5 ml-2 flex-shrink-0">
             <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#34C759] opacity-75" />
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-[#34C759]" />
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-success opacity-75" />
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-success" />
             </span>
-            <span className="text-[10px] font-bold text-[#34C759] uppercase tracking-wider">LIVE</span>
+            <span className="text-[10px] font-bold text-success uppercase tracking-wider">LIVE</span>
           </div>
         )}
       </div>
@@ -141,6 +143,7 @@ export const RightPanel = memo(function RightPanel(props: RightPanelProps) {
                 isProcessing={props.isProcessing}
                 onWorkspaceConfirm={props.onWorkspaceConfirm}
                 onWorkspaceAction={props.onWorkspaceAction}
+                onSupplementInput={props.onSupplementInput}
               />
             </motion.div>
           )}
@@ -177,7 +180,7 @@ export const RightPanel = memo(function RightPanel(props: RightPanelProps) {
                     animate={{ x: 0 }}
                     exit={{ x: '100%' }}
                     transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-                    className="absolute inset-0 bg-white z-20 shadow-xl"
+                    className="absolute inset-0 bg-card z-20 shadow-xl"
                   >
                     <LawyerAssistPanel />
                   </motion.div>
@@ -192,7 +195,7 @@ export const RightPanel = memo(function RightPanel(props: RightPanelProps) {
                     animate={{ x: 0 }}
                     exit={{ x: '100%' }}
                     transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-                    className="absolute inset-0 bg-white z-20 shadow-xl"
+                    className="absolute inset-0 bg-card z-20 shadow-xl"
                   >
                     <SigningWorkflow />
                   </motion.div>

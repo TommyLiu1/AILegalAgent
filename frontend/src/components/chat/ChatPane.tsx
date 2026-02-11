@@ -26,12 +26,12 @@ export function ChatPane({ messages, isProcessing }: ChatPaneProps) {
           className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}
         >
           <div
-            className={`max-w-[80%] rounded-2xl px-4 py-3 ${
+            className={`max-w-[80%] rounded-xl px-4 py-3 ${
               message.type === 'user'
-                ? 'bg-[#007AFF] text-white'
+                ? 'bg-primary text-primary-foreground'
                 : message.type === 'system'
-                ? 'bg-[#FFF8ED] text-[#FF9500] border border-[#FFD19A]'
-                : 'bg-[#F2F2F7] text-[#1C1C1E]'
+                ? 'bg-warning-light text-warning border border-warning/30'
+                : 'bg-muted text-foreground'
             }`}
           >
             {message.attachment && (
@@ -50,7 +50,7 @@ export function ChatPane({ messages, isProcessing }: ChatPaneProps) {
             <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.content}</p>
             <p
               className={`text-xs mt-1.5 ${
-                message.type === 'user' ? 'text-blue-100' : 'text-slate-500'
+                message.type === 'user' ? 'text-primary-foreground/70' : 'text-muted-foreground'
               }`}
             >
               {message.timestamp.toLocaleTimeString('zh-CN', {
@@ -68,9 +68,9 @@ export function ChatPane({ messages, isProcessing }: ChatPaneProps) {
           animate={{ opacity: 1 }}
           className="flex justify-start"
         >
-          <div className="bg-slate-100 rounded-2xl px-4 py-3 flex items-center gap-2">
-            <Loader2 className="w-4 h-4 animate-spin text-slate-600" />
-            <span className="text-sm text-slate-600">AI 正在思�?..</span>
+          <div className="bg-muted rounded-xl px-4 py-3 flex items-center gap-2">
+            <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+            <span className="text-sm text-muted-foreground">AI 正在思考...</span>
           </div>
         </motion.div>
       )}

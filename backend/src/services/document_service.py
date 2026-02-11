@@ -145,6 +145,7 @@ class DocumentService:
         # TODO: 从存储中删除文件
         
         await self.db.delete(document)
+        await self.db.flush()
         return True
     
     async def create_text_document(

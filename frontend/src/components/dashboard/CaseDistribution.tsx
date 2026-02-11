@@ -36,7 +36,7 @@ export function CaseDistribution() {
 
   if (loading) {
     return (
-      <div className="bg-white rounded-2xl border border-[#E5E5EA] p-6 h-[380px] flex items-center justify-center">
+      <div className="bg-white rounded-2xl border border-border p-6 h-[380px] flex items-center justify-center">
         <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
       </div>
     );
@@ -47,20 +47,20 @@ export function CaseDistribution() {
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 0.1 }}
-      className="bg-white rounded-2xl border border-[#E5E5EA] p-6"
+      className="bg-white rounded-2xl border border-border p-6"
     >
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h3 className="font-semibold text-[#1C1C1E]">案件分布</h3>
-          <p className="text-sm text-[#8E8E93] mt-1">当前进行中的案件类型统计</p>
+          <h3 className="font-semibold text-foreground">案件分布</h3>
+          <p className="text-sm text-muted-foreground mt-1">当前进行中的案件类型统计</p>
         </div>
-        <div className="flex gap-2 bg-[#F2F2F7] p-1 rounded-xl">
+        <div className="flex gap-2 bg-muted p-1 rounded-xl">
           <button
             onClick={() => setViewType('pie')}
             className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
               viewType === 'pie'
-                ? 'bg-white text-[#007AFF] shadow-sm'
-                : 'text-[#8E8E93] hover:text-[#1C1C1E]'
+                ? 'bg-card text-primary shadow-sm'
+                : 'text-muted-foreground hover:text-foreground'
             }`}
           >
             饼图
@@ -69,8 +69,8 @@ export function CaseDistribution() {
             onClick={() => setViewType('bar')}
             className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
               viewType === 'bar'
-                ? 'bg-white text-[#007AFF] shadow-sm'
-                : 'text-[#8E8E93] hover:text-[#1C1C1E]'
+                ? 'bg-card text-primary shadow-sm'
+                : 'text-muted-foreground hover:text-foreground'
             }`}
           >
             详情
@@ -115,9 +115,9 @@ export function CaseDistribution() {
                     className="w-3 h-3 rounded-full"
                     style={{ backgroundColor: item.color }}
                   />
-                  <span className="text-sm text-[#3C3C43] truncate max-w-[100px]">{item.name}</span>
+                  <span className="text-sm text-foreground/80 truncate max-w-[100px]">{item.name}</span>
                 </div>
-                <span className="text-sm font-semibold text-[#1C1C1E]">{item.value}</span>
+                <span className="text-sm font-semibold text-foreground">{item.value}</span>
               </motion.div>
             ))}
           </div>

@@ -1723,6 +1723,21 @@ export const notificationsApi = {
     request(`/notifications/${id}`, { method: 'DELETE' }),
 }
 
+// Skills 技能管理 API
+export const skillsApi = {
+  list: () =>
+    request<Array<{ name: string; description: string; version: string; triggers: string[]; content: string }>>('/skills/'),
+
+  get: (name: string) =>
+    request<{ name: string; description: string; version: string; triggers: string[]; content: string; path: string }>(`/skills/${name}`),
+
+  reload: () =>
+    request<{ message: string; count: number; skills: string[] }>('/skills/reload', { method: 'POST' }),
+
+  match: (query: string) =>
+    request<{ query: string; matched_count: number; skills: Array<{ name: string; description: string }> }>(`/skills/match?query=${encodeURIComponent(query)}`, { method: 'POST' }),
+}
+
 // 导出所有 API
 export default {
   auth: authApi,
@@ -1740,4 +1755,5 @@ export default {
   assets: assetsApi,
   mcp: mcpApi,
   notifications: notificationsApi,
+  skills: skillsApi,
 }

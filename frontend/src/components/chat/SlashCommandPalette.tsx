@@ -49,7 +49,7 @@ const SLASH_COMMANDS: SlashCommand[] = [
   { id: 'cmd-summarize', command: '/summarize', aliases: ['/总结', '/摘要'], label: '总结', description: '总结上下文或文档内容', icon: Wand2, query: '请总结以上内容', category: 'tool' },
   // 系统类（预留）
   { id: 'cmd-settings', command: '/settings', aliases: ['/设置'], label: '设置', description: '调整助手偏好设置（开发中）', icon: Settings, query: '', category: 'system' },
-  { id: 'cmd-skills', command: '/skills', aliases: ['/技能'], label: '技能管理', description: '查看和管理扩展技能（开发中）', icon: Zap, query: '', category: 'system' },
+  { id: 'cmd-skills', command: '/skills', aliases: ['/技能'], label: '技能管理', description: '查看已加载的法律专业技能', icon: Zap, query: '/skills', category: 'tool' },
 ];
 
 const CATEGORY_LABELS: Record<string, string> = {

@@ -45,7 +45,9 @@ class TaxComplianceAgent(BaseLegalAgent):
     async def process(self, task: Dict[str, Any]) -> AgentResponse:
         """处理财税任务"""
         description = task.get("description", "")
-        financial_data = task.get("context", {}).get("financial_data", {})
+        context = task.get("context") or {}
+        llm_config = context.get("llm_config") or task.get("llm_config")
+        financial_data = context.get("financial_data", {})
         
         prompt = f"""
 请进行财税合规分析：
@@ -63,14 +65,31 @@ class TaxComplianceAgent(BaseLegalAgent):
 4. **优化建议**：合规的改进措施或筹划方案。
 """
         
-        # 调用Agent
-        response = await self.chat(prompt)
+        # Inject dependency results
+        dep_results = task.get("dependent_results", {})
+        if dep_results:
+            dep_context = "\n\n--- 前序分析结果 ---\n"
+            for dep_id, dep_res in dep_results.items():
+                if hasattr(dep_res, 'content'):
+                    dep_context += f"\n{dep_res.agent_name}:\n{dep_res.content[:1500]}\n"
+                elif isinstance(dep_res, dict):
+                    dep_context += f"\n{dep_res.get('agent_name', dep_id)}:\n{str(dep_res.get('content', ''))[:1500]}\n"
+            prompt += dep_context
         
-        return AgentResponse(
-            agent_name=self.name,
-            content=response,
-            reasoning="基于税收征管法及会计准则",
-            actions=[
-                {"type": "tax_advisory", "description": "出具财税合规意见"}
-            ]
-        )
+        try:
+            response = await self.chat(prompt, llm_config=llm_config)
+            
+            return AgentResponse(
+                agent_name=self.name,
+                content=response,
+                reasoning="基于税收征管法及会计准则",
+                actions=[
+                    {"type": "tax_advisory", "description": "出具财税合规意见"}
+                ]
+            )
+        except Exception as e:
+            return AgentResponse(
+                agent_name=self.name,
+                content=f"处理失败: {str(e)[:200]}",
+                metadata={"error": True}
+            )

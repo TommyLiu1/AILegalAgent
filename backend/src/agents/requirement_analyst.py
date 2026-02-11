@@ -135,35 +135,83 @@ class RequirementAnalystAgent(BaseLegalAgent):
             return self._fallback_analysis(user_input)
     
     def _fallback_analysis(self, user_input: str) -> Dict[str, Any]:
-        """兜底分析（规则引擎）"""
-        # 简单关键词判断复杂度
+        """兜底分析（规则引擎）— 当 LLM 不可用或返回无效结果时使用"""
+        # 关键词判断复杂度和推荐 Agent
         complex_keywords = ["起诉", "仲裁", "尽职调查", "并购", "股权"]
         moderate_keywords = ["合同", "审查", "起草", "风险", "协议", "文书"]
         
         complexity = "simple"
+        suggested_agents = ["legal_advisor"]
+        legal_area = "通用"
+        
         if any(kw in user_input for kw in complex_keywords):
             complexity = "complex"
         elif any(kw in user_input for kw in moderate_keywords):
             complexity = "moderate"
         
-        is_complete = len(user_input) > 20 or complexity == "simple"
+        # 按关键词推荐具体 Agent
+        if any(kw in user_input for kw in ["审查合同", "合同审查", "审核合同", "审查协议"]):
+            suggested_agents = ["contract_reviewer", "risk_assessor"]
+            legal_area = "合同法"
+        elif any(kw in user_input for kw in ["起草", "草拟", "写一份", "拟一份", "文书", "律师函", "方案", "法律意见书"]):
+            suggested_agents = ["document_drafter"]
+            legal_area = "文书起草"
+        elif any(kw in user_input for kw in ["合同", "协议", "条款"]):
+            suggested_agents = ["contract_reviewer", "risk_assessor"]
+            legal_area = "合同法"
+        elif any(kw in user_input for kw in ["起诉", "诉讼", "仲裁", "胜诉", "败诉", "庭审"]):
+            suggested_agents = ["litigation_strategist"]
+            legal_area = "诉讼"
+        elif any(kw in user_input for kw in ["劳动", "员工", "辞退", "入职", "赔偿", "社保", "工伤", "劳动人事", "人事"]):
+            suggested_agents = ["labor_compliance"]
+            legal_area = "劳动法"
+        elif any(kw in user_input for kw in ["尽职调查", "尽调", "背景调查", "查公司", "企业调查"]):
+            suggested_agents = ["due_diligence"]
+            legal_area = "尽职调查"
+        elif any(kw in user_input for kw in ["专利", "商标", "知识产权", "版权", "侵权", "著作权"]):
+            suggested_agents = ["ip_specialist"]
+            legal_area = "知识产权"
+        elif any(kw in user_input for kw in ["税", "发票", "报销", "财务", "股权转让"]):
+            suggested_agents = ["tax_compliance"]
+            legal_area = "财税"
+        elif any(kw in user_input for kw in ["监管", "新规", "政策", "法规解读"]):
+            suggested_agents = ["regulatory_monitor"]
+            legal_area = "监管合规"
+        elif any(kw in user_input for kw in ["证据", "录音", "鉴定", "证据链"]):
+            suggested_agents = ["evidence_analyst"]
+            legal_area = "证据处理"
+        elif any(kw in user_input for kw in ["签约", "签字", "盖章", "电子签"]):
+            suggested_agents = ["contract_steward"]
+            legal_area = "电子签约"
+        elif any(kw in user_input for kw in ["归档", "合同管理", "到期", "履约"]):
+            suggested_agents = ["contract_steward"]
+            legal_area = "合同管理"
+        elif any(kw in user_input for kw in ["风险", "合规", "审查"]):
+            suggested_agents = ["risk_assessor", "compliance_officer"]
+            legal_area = "合规"
         
+        # 兜底模式下，始终标记 is_complete=True 以避免死循环
+        # 即使信息不完整，也让 Agent 直接处理并在回复中自然追问
         return {
-            "is_complete": is_complete,
-            "completeness_score": 0.8 if is_complete else 0.4,
+            "is_complete": True,
+            "completeness_score": 0.6,
             "summary": user_input[:100],
             "elements": {
                 "core_demand": user_input[:200],
                 "parties": "",
                 "key_facts": "",
-                "legal_area": "通用",
+                "legal_area": legal_area,
                 "expected_outcome": "",
                 "has_attachments": False,
             },
-            "missing_elements": [] if is_complete else ["详细描述"],
+            "missing_elements": [],
             "guidance_questions": [],
-            "suggested_agents": ["legal_advisor"],
+            "suggested_agents": suggested_agents,
             "complexity": complexity,
+            "natural_followup": (
+                "请在回复中自然地向用户询问缺失的关键信息（如合同文本、具体事实等），"
+                "同时先基于已知信息给出初步分析和指导。"
+            ),
         }
     
     def _parse_json(self, text: str) -> Dict[str, Any]:

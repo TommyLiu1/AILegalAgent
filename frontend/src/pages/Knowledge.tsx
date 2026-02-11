@@ -19,51 +19,46 @@ const NAV_ITEMS = [
     id: 'search',
     label: '智慧搜索',
     icon: Search,
-    accent: '#6366f1',        // indigo
-    bgActive: 'bg-indigo-50',
-    textActive: 'text-indigo-700',
-    iconActive: 'text-indigo-600',
-    dotColor: 'bg-indigo-500',
+    bgActive: 'bg-primary/10',
+    textActive: 'text-primary',
+    iconActive: 'text-primary',
+    dotColor: 'bg-primary',
   },
   {
     id: 'bases',
     label: '知识库',
     icon: Database,
-    accent: '#0ea5e9',        // sky
-    bgActive: 'bg-sky-50',
-    textActive: 'text-sky-700',
-    iconActive: 'text-sky-600',
-    dotColor: 'bg-sky-500',
+    bgActive: 'bg-primary/10',
+    textActive: 'text-primary',
+    iconActive: 'text-primary',
+    dotColor: 'bg-primary',
   },
   {
     id: 'graph',
     label: '知识图谱',
     icon: Network,
-    accent: '#8b5cf6',        // violet
-    bgActive: 'bg-violet-50',
-    textActive: 'text-violet-700',
-    iconActive: 'text-violet-600',
-    dotColor: 'bg-violet-500',
+    bgActive: 'bg-primary/10',
+    textActive: 'text-primary',
+    iconActive: 'text-primary',
+    dotColor: 'bg-primary',
   },
   {
     id: 'experience',
     label: '经验',
     icon: Brain,
-    accent: '#f59e0b',        // amber
-    bgActive: 'bg-amber-50',
-    textActive: 'text-amber-700',
-    iconActive: 'text-amber-600',
-    dotColor: 'bg-amber-500',
+    bgActive: 'bg-primary/10',
+    textActive: 'text-primary',
+    iconActive: 'text-primary',
+    dotColor: 'bg-primary',
   },
   {
     id: 'evolution',
     label: '进化',
     icon: Zap,
-    accent: '#10b981',        // emerald
-    bgActive: 'bg-emerald-50',
-    textActive: 'text-emerald-700',
-    iconActive: 'text-emerald-600',
-    dotColor: 'bg-emerald-500',
+    bgActive: 'bg-primary/10',
+    textActive: 'text-primary',
+    iconActive: 'text-primary',
+    dotColor: 'bg-primary',
   },
 ] as const
 
@@ -73,18 +68,49 @@ export default function Knowledge() {
   const [activeNav, setActiveNav] = useState<NavId>('search')
 
   return (
-    <div className="h-full flex bg-white">
-      {/* ====== 左侧边栏 ====== */}
-      <aside className="w-48 flex-shrink-0 border-r border-slate-100 flex flex-col bg-slate-50/60">
+    <div className="h-full flex flex-col lg:flex-row bg-background">
+      {/* ====== 小屏顶部横向滚动导航 ====== */}
+      <div className="lg:hidden flex-shrink-0 border-b border-border bg-muted/60">
+        <div className="px-4 pt-4 pb-2">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center shadow-md shadow-primary/25">
+              <BookOpen className="w-4 h-4 text-primary-foreground" />
+            </div>
+            <h2 className="text-2xl font-bold tracking-tight text-foreground">知识中心</h2>
+          </div>
+        </div>
+        <nav className="flex overflow-x-auto px-2.5 pb-2 gap-1 scrollbar-none">
+          {NAV_ITEMS.map((item) => {
+            const isActive = activeNav === item.id
+            return (
+              <button
+                key={item.id}
+                onClick={() => setActiveNav(item.id)}
+                className={`flex-shrink-0 flex items-center gap-2 px-3 py-2 rounded-xl text-[13px] font-medium transition-all relative ${
+                  isActive
+                    ? `${item.bgActive} ${item.textActive}`
+                    : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                }`}
+              >
+                <item.icon className={`w-4 h-4 flex-shrink-0 ${isActive ? item.iconActive : 'text-muted-foreground/50 group-hover:text-muted-foreground'}`} />
+                <span>{item.label}</span>
+              </button>
+            )
+          })}
+        </nav>
+      </div>
+
+      {/* ====== 左侧边栏（大屏可见） ====== */}
+      <aside className="hidden lg:flex w-full lg:w-48 flex-shrink-0 border-r border-border flex-col bg-muted/60">
         {/* 头部标识 */}
         <div className="px-4 pt-5 pb-4">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center shadow-md shadow-indigo-500/25">
-              <BookOpen className="w-4 h-4 text-white" />
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center shadow-md shadow-primary/25">
+              <BookOpen className="w-4 h-4 text-primary-foreground" />
             </div>
             <div>
-              <h2 className="text-sm font-bold text-slate-900 leading-tight">知识中心</h2>
-              <p className="text-[10px] text-slate-400 leading-tight">Knowledge Hub</p>
+              <h2 className="text-2xl font-bold tracking-tight text-foreground leading-tight">知识中心</h2>
+              <p className="text-[10px] text-muted-foreground/50 leading-tight">Knowledge Hub</p>
             </div>
           </div>
         </div>
@@ -100,7 +126,7 @@ export default function Knowledge() {
                 className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-[13px] font-medium transition-all relative group ${
                   isActive
                     ? `${item.bgActive} ${item.textActive}`
-                    : 'text-slate-500 hover:text-slate-700 hover:bg-slate-100/80'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-muted'
                 }`}
               >
                 {/* 左侧激活指示条 */}
@@ -111,7 +137,7 @@ export default function Knowledge() {
                     transition={{ type: 'spring', stiffness: 400, damping: 30 }}
                   />
                 )}
-                <item.icon className={`w-4 h-4 flex-shrink-0 ${isActive ? item.iconActive : 'text-slate-400 group-hover:text-slate-500'}`} />
+                <item.icon className={`w-4 h-4 flex-shrink-0 ${isActive ? item.iconActive : 'text-muted-foreground/50 group-hover:text-muted-foreground'}`} />
                 <span>{item.label}</span>
               </button>
             )
@@ -120,14 +146,14 @@ export default function Knowledge() {
 
         {/* 底部装饰 */}
         <div className="px-4 py-4">
-          <div className="text-[10px] text-slate-300 leading-relaxed">
+          <div className="text-[10px] text-muted-foreground/50 leading-relaxed">
             RAG · Neo4j · RLHF-Lite
           </div>
         </div>
       </aside>
 
       {/* ====== 主内容区 ====== */}
-      <main className="flex-1 overflow-hidden bg-white">
+      <main className="flex-1 overflow-hidden bg-background">
         <AnimatePresence mode="wait">
           <motion.div
             key={activeNav}

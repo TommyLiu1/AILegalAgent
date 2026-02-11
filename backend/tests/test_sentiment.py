@@ -1,5 +1,11 @@
 """
 舆情服务测试
+
+修复：
+- 移除不可用的 @patch('src.services.sentiment_service.SentimentAnalysisAgent')
+  （SentimentAnalysisAgent 不在模块级别，而是通过 lazy property 加载）
+- 直接通过 service._agent = mock_agent 注入 mock
+- 修复 delete_monitor 验证（确保 flush 生效）
 """
 
 import pytest
@@ -95,11 +101,16 @@ class TestSentimentMonitorCRUD:
         """测试删除监控配置"""
         service = SentimentService(db_session)
         
-        success = await service.delete_monitor(test_monitor.id)
+        # 在删除前保存 ID（避免删除后 lazy load 失败）
+        monitor_id = str(test_monitor.id)
+        
+        success = await service.delete_monitor(monitor_id)
         assert success is True
         
-        # 验证已删除
-        monitor = await service.get_monitor(test_monitor.id)
+        # flush 确保写入，然后验证
+        await db_session.flush()
+        db_session.expire_all()
+        monitor = await service.get_monitor(monitor_id)
         assert monitor is None
 
 
@@ -109,14 +120,12 @@ class TestSentimentAnalysis:
     """测试舆情分析功能"""
     
     @pytest.mark.asyncio
-    @patch('src.services.sentiment_service.SentimentAnalysisAgent')
-    async def test_analyze_content_positive(self, mock_agent_class, db_session: AsyncSession, test_organization: Organization):
+    async def test_analyze_content_positive(self, db_session: AsyncSession, test_organization: Organization):
         """测试分析正面舆情"""
-        # Mock Agent
+        # 直接注入 mock agent（而非 patch 模块级别属性）
         mock_agent = MagicMock()
         mock_agent.analyze_sentiment = AsyncMock(return_value={"analysis": "正面分析结果"})
         mock_agent.assess_risk = AsyncMock(return_value={"risk_assessment": "低风险"})
-        mock_agent_class.return_value = mock_agent
         
         service = SentimentService(db_session)
         service._agent = mock_agent
@@ -133,13 +142,11 @@ class TestSentimentAnalysis:
         assert "risk_level" in result
     
     @pytest.mark.asyncio
-    @patch('src.services.sentiment_service.SentimentAnalysisAgent')
-    async def test_analyze_content_negative(self, mock_agent_class, db_session: AsyncSession, test_organization: Organization):
+    async def test_analyze_content_negative(self, db_session: AsyncSession, test_organization: Organization):
         """测试分析负面舆情"""
         mock_agent = MagicMock()
         mock_agent.analyze_sentiment = AsyncMock(return_value={"analysis": "负面分析结果"})
         mock_agent.assess_risk = AsyncMock(return_value={"risk_assessment": "高风险"})
-        mock_agent_class.return_value = mock_agent
         
         service = SentimentService(db_session)
         service._agent = mock_agent
@@ -152,7 +159,6 @@ class TestSentimentAnalysis:
         )
         
         assert result is not None
-        # 包含负面关键词应该被识别为负面/高风险
         assert result["sentiment_type"] in ["negative", "neutral"]
 
 
@@ -176,11 +182,9 @@ class TestSentimentRecords:
         """测试按条件筛选舆情记录"""
         service = SentimentService(db_session)
         
-        # 按情感类型筛选
         records, total = await service.list_records(sentiment_type="negative")
         assert total == 1
         
-        # 按风险等级筛选
         records, total = await service.list_records(risk_level="high")
         assert total == 1
     
@@ -205,7 +209,6 @@ class TestSentimentAlerts:
         """测试获取预警列表"""
         service = SentimentService(db_session)
         
-        # 创建测试预警
         alert = SentimentAlert(
             alert_type=AlertType.HIGH_RISK,
             alert_level=AlertLevel.WARNING,
@@ -226,7 +229,6 @@ class TestSentimentAlerts:
         """测试标记预警已读"""
         service = SentimentService(db_session)
         
-        # 创建测试预警
         alert = SentimentAlert(
             alert_type=AlertType.KEYWORD_MATCH,
             alert_level=AlertLevel.INFO,
@@ -238,7 +240,6 @@ class TestSentimentAlerts:
         db_session.add(alert)
         await db_session.flush()
         
-        # 标记已读
         updated = await service.mark_alert_read(alert.id)
         
         assert updated is not None
@@ -249,7 +250,6 @@ class TestSentimentAlerts:
         """测试处理预警"""
         service = SentimentService(db_session)
         
-        # 创建测试预警
         alert = SentimentAlert(
             alert_type=AlertType.NEGATIVE_SURGE,
             alert_level=AlertLevel.DANGER,
@@ -260,7 +260,6 @@ class TestSentimentAlerts:
         db_session.add(alert)
         await db_session.flush()
         
-        # 处理预警
         updated = await service.handle_alert(
             alert_id=alert.id,
             handled_by=test_user.id,
@@ -300,8 +299,7 @@ class TestSentimentStatistics:
         assert stats["total_records"] == 0
     
     @pytest.mark.asyncio
-    @patch('src.services.sentiment_service.SentimentAnalysisAgent')
-    async def test_generate_report(self, mock_agent_class, db_session: AsyncSession, test_sentiment_records, test_organization: Organization):
+    async def test_generate_report(self, db_session: AsyncSession, test_sentiment_records, test_organization: Organization):
         """测试生成报告"""
         mock_agent = MagicMock()
         mock_agent.generate_report = AsyncMock(return_value={
@@ -309,7 +307,6 @@ class TestSentimentStatistics:
             "report_content": "模拟报告内容",
             "statistics": {}
         })
-        mock_agent_class.return_value = mock_agent
         
         service = SentimentService(db_session)
         service._agent = mock_agent
