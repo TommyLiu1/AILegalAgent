@@ -280,6 +280,7 @@ class BaseLegalAgent(ABC):
         llm_config: Optional[Any] = None,
         system_prompt_override: Optional[str] = None,
         enable_reflection: bool = False,
+        max_tokens: Optional[int] = None,
     ) -> str:
         """
         对话接口 (v2 优化版)
@@ -297,6 +298,7 @@ class BaseLegalAgent(ABC):
             llm_config: 动态 LLM 配置（可选）
             system_prompt_override: 临时覆盖 system prompt（不修改实例状态）
             enable_reflection: 是否启用反思机制（默认关闭）
+            max_tokens: 最大输出 token 数（可选，用于限制响应长度）
         """
         try:
             # 广播思考状态
@@ -374,6 +376,9 @@ class BaseLegalAgent(ABC):
                     "messages": messages,
                     "temperature": temperature,
                 }
+                
+                if max_tokens:
+                    payload["max_tokens"] = max_tokens
                 
                 if available_tools:
                     payload["tools"] = available_tools
