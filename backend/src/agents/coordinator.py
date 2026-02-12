@@ -517,12 +517,13 @@ class CoordinatorAgent(BaseLegalAgent):
     # ========== 极速关键词意图匹配（0ms 级别，跳过 LLM）==========
     
     # 关键词 → 意图映射表（按优先级排列，越靠前越优先）
+    # 注意：关键词仅匹配用户输入的前 200 字符（即用户实际问题），避免合同正文干扰
     _KEYWORD_INTENT_RULES = [
         # (关键词列表, 意图, 置信度)
-        (["电子签", "发起签约", "签字", "签署"], "E_SIGNATURE", 0.92),
+        (["审查合同", "合同审查", "审合同", "审查这份", "审查一下", "条款审核", "合同风险", "帮我审查"], "CONTRACT_REVIEW", 0.92),
+        (["电子签", "发起签约", "电子签章", "电子签约", "在线签署"], "E_SIGNATURE", 0.92),
         (["归档", "合同到期", "履约提醒", "合同管理", "合同状态"], "CONTRACT_MANAGEMENT", 0.90),
         (["发布制度", "签收", "全员通知", "公告", "员工手册发布"], "POLICY_DISTRIBUTION", 0.90),
-        (["审查合同", "合同审查", "审合同", "条款审核", "合同风险"], "CONTRACT_REVIEW", 0.90),
         (["起草", "草拟", "写一份", "拟一份", "律师函", "法律文书", "法律意见书"], "DOCUMENT_DRAFTING", 0.90),
         (["尽职调查", "尽调", "背景调查", "企业调查", "查公司"], "DUE_DILIGENCE", 0.90),
         (["诉讼策略", "起诉", "胜诉", "败诉", "庭审", "反诉", "仲裁"], "LITIGATION_STRATEGY", 0.88),
@@ -539,8 +540,10 @@ class CoordinatorAgent(BaseLegalAgent):
         基于关键词的极速意图匹配（无 LLM 调用，< 1ms）。
         
         覆盖 80% 的常见法务场景，仅在匹配置信度 >= 0.8 时使用。
+        仅匹配前 200 字符（用户实际问题），避免合同/文书正文中的关键词造成误匹配。
         """
-        desc_lower = description.lower()
+        # 只取前 200 字符进行关键词匹配，防止合同正文中的"签署""签字"等通用词干扰
+        desc_lower = description[:200].lower()
         for keywords, intent, confidence in self._KEYWORD_INTENT_RULES:
             matched = sum(1 for kw in keywords if kw in desc_lower)
             if matched >= 1:

@@ -563,6 +563,7 @@ class MemoryIntegration:
     ):
         """将完整执行轨迹写入情景记忆"""
         try:
+            import json as _json
             from src.services.episodic_memory_service import episodic_memory
             
             # 构建增强的结果（包含各 Agent 推理链和重试次数）
@@ -576,9 +577,25 @@ class MemoryIntegration:
                 for name, ctx in agent_contexts.items()
             }
             
+            # 清理 plan：执行过程中 plan 字典会被注入 dependent_results（包含不可序列化的
+            # AgentResponse 对象），这里做深拷贝并过滤掉不可序列化的字段
+            safe_plan = []
+            for step in plan:
+                safe_step = {}
+                for k, v in step.items():
+                    if k == "dependent_results":
+                        # 跳过包含 AgentResponse 对象的依赖结果
+                        continue
+                    try:
+                        _json.dumps(v, ensure_ascii=False)
+                        safe_step[k] = v
+                    except (TypeError, ValueError):
+                        safe_step[k] = str(v)
+                safe_plan.append(safe_step)
+            
             memory_id = await episodic_memory.add_memory(
                 task_description=task_desc,
-                plan=plan,
+                plan=safe_plan,
                 final_result=enhanced_result,
             )
             return memory_id

@@ -85,13 +85,14 @@ class BaseLegalAgent(ABC):
     @classmethod
     async def get_http_client(cls) -> httpx.AsyncClient:
         """获取类级别共享的 httpx 客户端（带连接池）"""
-        if cls._shared_http_client is None or cls._shared_http_client.is_closed:
-            async with cls._client_lock:
+        # 注意：始终在基类上读写 _shared_http_client，避免每个子类各创建一个连接池
+        if BaseLegalAgent._shared_http_client is None or BaseLegalAgent._shared_http_client.is_closed:
+            async with BaseLegalAgent._client_lock:
                 # 双重检查锁
-                if cls._shared_http_client is None or cls._shared_http_client.is_closed:
+                if BaseLegalAgent._shared_http_client is None or BaseLegalAgent._shared_http_client.is_closed:
                     _max_conn = settings.AGENT_HTTP_MAX_CONNECTIONS
                     _keepalive_conn = settings.AGENT_HTTP_KEEPALIVE_CONNECTIONS
-                    cls._shared_http_client = httpx.AsyncClient(
+                    BaseLegalAgent._shared_http_client = httpx.AsyncClient(
                         timeout=httpx.Timeout(30.0, connect=5.0),
                         limits=httpx.Limits(
                             max_connections=_max_conn,
@@ -104,14 +105,14 @@ class BaseLegalAgent(ABC):
                         f"(max_conn={_max_conn}, keepalive={_keepalive_conn}, "
                         f"llm_concurrency={settings.AGENT_LLM_CONCURRENCY})"
                     )
-        return cls._shared_http_client
+        return BaseLegalAgent._shared_http_client
     
     @classmethod
     async def close_http_client(cls):
         """关闭共享 httpx 客户端（应用关闭时调用）"""
-        if cls._shared_http_client and not cls._shared_http_client.is_closed:
-            await cls._shared_http_client.aclose()
-            cls._shared_http_client = None
+        if BaseLegalAgent._shared_http_client and not BaseLegalAgent._shared_http_client.is_closed:
+            await BaseLegalAgent._shared_http_client.aclose()
+            BaseLegalAgent._shared_http_client = None
             logger.info("共享 httpx 连接池已关闭")
     
     def __init__(self, config: AgentConfig):
