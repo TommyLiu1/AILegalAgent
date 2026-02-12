@@ -268,7 +268,10 @@ class BaseLegalAgent(ABC):
                     logger.warning(f"API调用异常: {e}，等待 {delay:.1f}s 后重试 (尝试 {attempt}/{self.MAX_RETRIES})")
                     await asyncio.sleep(delay)
         
-        raise Exception(f"LLM调用在 {self.MAX_RETRIES} 次重试后失败: {last_error}")
+        error_detail = str(last_error) if last_error else "未知错误"
+        if not error_detail.strip():
+            error_detail = f"{type(last_error).__name__}: 请求超时或连接失败"
+        raise Exception(f"LLM调用在 {self.MAX_RETRIES} 次重试后失败: {error_detail}")
     
     async def chat(
         self,

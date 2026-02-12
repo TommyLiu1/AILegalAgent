@@ -427,8 +427,13 @@ async def websocket_chat(websocket: WebSocket, session_id: str):
         logger.warning(f"WebSocket: 创建/获取对话记录失败: {e}")
         conversation_id = session_id  # 即使数据库操作失败也保持 session_id
     
+    # WebSocket 连接状态标记，避免在连接关闭后反复发送产生大量警告
+    _ws_closed = False
+
     # 订阅 EventBus
     async def event_handler(event_data):
+        if _ws_closed:
+            return
         try:
             await websocket.send_json({"type": "event_bus_msg", "data": event_data})
         except Exception:
@@ -439,9 +444,14 @@ async def websocket_chat(websocket: WebSocket, session_id: str):
     # --- 辅助函数 ---
     async def _send(event_type: str, data: dict):
         """安全发送 WebSocket 消息"""
+        nonlocal _ws_closed
+        if _ws_closed:
+            return
         try:
             await websocket.send_json({**data, "type": event_type, "session_id": session_id})
         except Exception as e:
+            if "close" in str(e).lower():
+                _ws_closed = True
             logger.warning(f"WS 发送失败: {e}")
 
     async def _load_llm_config():
@@ -701,7 +711,7 @@ async def websocket_chat(websocket: WebSocket, session_id: str):
                             sa_select(DocModel).where(
                                 and_(
                                     DocModel.doc_metadata.isnot(None),
-                                    DocModel.doc_metadata["conversation_id"].astext == conversation_id,
+                                    cast(DocModel.doc_metadata["conversation_id"], String) == conversation_id,
                                     DocModel.description.like("Canvas:%"),
                                 )
                             ).order_by(DocModel.updated_at.desc()).limit(1)
@@ -1116,11 +1126,14 @@ async def websocket_chat(websocket: WebSocket, session_id: str):
                 await _send("error", {"content": f"处理失败: {str(e)}"})
             
     except WebSocketDisconnect:
+        _ws_closed = True
         logger.info(f"WebSocket断开连接: {session_id}")
     except RuntimeError as e:
+        _ws_closed = True
         # Starlette 在连接已断开时可能抛 RuntimeError 而非 WebSocketDisconnect
         logger.info(f"WebSocket运行时断开: {session_id} ({e})")
     except Exception as e:
+        _ws_closed = True
         logger.error(f"WebSocket未知异常: {session_id} - {e}")
 
 
@@ -1190,13 +1203,13 @@ async def get_conversation_canvas(
     """获取对话关联的 Canvas 文档内容"""
     try:
         from src.models.document import Document as DocModel
-        from sqlalchemy import select as sa_select, and_
+        from sqlalchemy import select as sa_select, and_, cast, String
         
         result = await db.execute(
             sa_select(DocModel).where(
                 and_(
                     DocModel.doc_metadata.isnot(None),
-                    DocModel.doc_metadata["conversation_id"].astext == conversation_id,
+                    cast(DocModel.doc_metadata["conversation_id"], String) == conversation_id,
                     DocModel.description.like("Canvas:%"),
                 )
             ).order_by(DocModel.updated_at.desc()).limit(1)
