@@ -333,15 +333,36 @@ class BaseLegalAgent(ABC):
             # 使用传入的配置 > contextvars 任务配置 > 默认配置
             active_config = llm_config or _task_llm_config_var.get(None) or self.llm_config
             
-            # Debug logging
-            provider = getattr(active_config, 'provider', 'N/A')
-            base_url_str = getattr(active_config, 'api_base_url', 'N/A')
-            key_preview = getattr(active_config, 'api_key', '')[:5] + '...' if getattr(active_config, 'api_key', '') else 'None'
-            logger.info(f"Agent {self.name} using config: Provider={provider}, API Base={base_url_str}, Key={key_preview}")
-            
-            # 检查配置有效性：如果没有有效的 API Key，直接返回提示而非 mock
+            # 检查配置有效性：如果当前配置无效，尝试从数据库加载（自愈机制）
             _check_key = getattr(active_config, 'api_key', '') if active_config else ''
-            if not _check_key or _check_key == 'sk-dummy-key' or 'dummy' in _check_key:
+            if not _check_key or _check_key == 'sk-dummy-key' or 'dummy' in str(_check_key or ''):
+                logger.warning(f"Agent {self.name}: 当前配置无效 (key={_check_key[:8] if _check_key else 'None'}...)，尝试从数据库加载")
+                try:
+                    from src.core.database import async_session_maker
+                    from src.services.llm_service import LLMService
+                    async with async_session_maker() as _db:
+                        _db_cfg = await LLMService.get_default_config(_db)
+                        if not _db_cfg:
+                            from src.models.llm_config import LLMConfig
+                            from sqlalchemy import select as _sel
+                            _r = await _db.execute(
+                                _sel(LLMConfig)
+                                .where(LLMConfig.config_type == "llm")
+                                .where(LLMConfig.is_active == True)
+                                .order_by(LLMConfig.updated_at.desc())
+                                .limit(1)
+                            )
+                            _db_cfg = _r.scalar_one_or_none()
+                        if _db_cfg and getattr(_db_cfg, 'api_key', None):
+                            active_config = _db_cfg
+                            _check_key = getattr(active_config, 'api_key', '')
+                            logger.info(f"Agent {self.name}: 从数据库成功加载 LLM 配置: {getattr(_db_cfg, 'name', 'unknown')}")
+                except Exception as _db_err:
+                    logger.warning(f"Agent {self.name}: 数据库加载 LLM 配置失败: {_db_err}")
+            
+            # 最终校验：如果仍然无效，返回提示
+            _final_key = getattr(active_config, 'api_key', '') if active_config else ''
+            if not _final_key or _final_key == 'sk-dummy-key' or 'dummy' in str(_final_key or ''):
                 logger.warning(f"Agent {self.name}: 没有有效的 API Key，请在设置页面配置 LLM 模型")
                 return ("尚未配置有效的大语言模型 API Key。\n\n"
                         "请按以下步骤操作：\n"
@@ -349,6 +370,12 @@ class BaseLegalAgent(ABC):
                         "2. 进入 **模型配置 (LLM)** 标签\n"
                         "3. 编辑您的模型配置，输入有效的 API Key\n"
                         "4. 保存后重新发送消息即可")
+            
+            # Debug logging
+            provider = getattr(active_config, 'provider', 'N/A')
+            base_url_str = getattr(active_config, 'api_base_url', 'N/A')
+            key_preview = _final_key[:5] + '...' if _final_key else 'None'
+            logger.info(f"Agent {self.name} using config: Provider={provider}, API Base={base_url_str}, Key={key_preview}")
             
             # 准备请求参数
             url, headers, model_name = self._prepare_llm_request(active_config)
@@ -506,6 +533,32 @@ class BaseLegalAgent(ABC):
             try:
                 system_prompt = system_prompt_override or self.system_prompt
                 active_config = llm_config or _task_llm_config_var.get(None) or self.llm_config
+                
+                # 自愈：如果当前配置无效，尝试从数据库加载
+                _sk = getattr(active_config, 'api_key', '') if active_config else ''
+                if not _sk or _sk == 'sk-dummy-key' or 'dummy' in str(_sk or ''):
+                    try:
+                        from src.core.database import async_session_maker
+                        from src.services.llm_service import LLMService
+                        async with async_session_maker() as _db:
+                            _db_cfg = await LLMService.get_default_config(_db)
+                            if not _db_cfg:
+                                from src.models.llm_config import LLMConfig
+                                from sqlalchemy import select as _sel
+                                _r = await _db.execute(
+                                    _sel(LLMConfig)
+                                    .where(LLMConfig.config_type == "llm")
+                                    .where(LLMConfig.is_active == True)
+                                    .order_by(LLMConfig.updated_at.desc())
+                                    .limit(1)
+                                )
+                                _db_cfg = _r.scalar_one_or_none()
+                            if _db_cfg and getattr(_db_cfg, 'api_key', None):
+                                active_config = _db_cfg
+                                logger.info(f"Agent {self.name} stream_chat: 从数据库加载 LLM 配置")
+                    except Exception as _e:
+                        logger.warning(f"Agent {self.name} stream_chat: DB配置加载失败: {_e}")
+                
                 url, headers, model_name = self._prepare_llm_request(active_config)
                 
                 # 推理型模型强制 temperature=1
